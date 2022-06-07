@@ -34,6 +34,13 @@ ppl::common::RetCode leaky_relu_fp32_sse(
     const float alpha,
     float *dst);
 
+ppl::common::RetCode leaky_relu_fp32(
+    const ppl::common::isa_t isa,
+    const ppl::nn::TensorShape *src_shape,
+    const float *src,
+    const float alpha,
+    float *dst);
+
 }}}; // namespace ppl::kernel::x86
 
 #endif
