@@ -18,8 +18,7 @@
 #ifndef __ST_PPL_KERNEL_RISCV_COMMON_FC_H_
 #define __ST_PPL_KERNEL_RISCV_COMMON_FC_H_
 
-#include "ppl/nn/common/tensor_shape.h"
-#include "ppl/nn/runtime/tensor_impl.h"
+#include "ppl/common/tensor_shape.h"
 #include "ppl/kernel/riscv/common/general_include.h"
 #include "ppl/kernel/riscv/common/fc_common.h"
 #include "ppl/common/generic_cpu_allocator.h"
@@ -67,8 +66,8 @@ public:
     virtual ppl::common::RetCode execute()                                       = 0;
     virtual void set_temp_buffer(void* temp_buffer)                              = 0;
     virtual const fc_common_param* fc_param() const                              = 0;
-    virtual ppl::common::RetCode set_src_tensor(ppl::nn::TensorImpl& src_tensor) = 0;
-    virtual ppl::common::RetCode set_dst_tensor(ppl::nn::TensorImpl& src_tensor) = 0;
+    virtual ppl::common::RetCode set_src_tensor(const ppl::common::TensorShape* src_shape, void* data) = 0;
+    virtual ppl::common::RetCode set_dst_tensor(const ppl::common::TensorShape* dst_shape, void* data) = 0;
     virtual ~fc_base_executor() {}
 };
 
@@ -80,9 +79,9 @@ protected:
     const T* cvt_bias_;
 
     const T* src_;
-    const ppl::nn::TensorShape* src_shape_;
+    const ppl::common::TensorShape* src_shape_;
     T* dst_;
-    const ppl::nn::TensorShape* dst_shape_;
+    const ppl::common::TensorShape* dst_shape_;
 
     void* temp_buffer_;
 
@@ -114,16 +113,16 @@ public:
     virtual ppl::common::RetCode execute()  = 0;
     virtual ~fc_executor() {}
 
-    virtual ppl::common::RetCode set_src_tensor(ppl::nn::TensorImpl& src_tensor) override
+    virtual ppl::common::RetCode set_src_tensor(const ppl::common::TensorShape* src_shape, void* data) override
     {
-        set_src_shape(src_tensor.GetShape());
-        set_src(src_tensor.GetBufferPtr<T>());
+        set_src_shape(src_shape);
+        set_src(reinterpret_cast<T *>(data));
         return ppl::common::RC_SUCCESS;
     };
-    virtual ppl::common::RetCode set_dst_tensor(ppl::nn::TensorImpl& dst_tensor) override
+    virtual ppl::common::RetCode set_dst_tensor(const ppl::common::TensorShape* dst_shape, void* data) override
     {
-        set_dst_shape(dst_tensor.GetShape());
-        set_dst(dst_tensor.GetBufferPtr<T>());
+        set_dst_shape(dst_shape);
+        set_dst(reinterpret_cast<T *>(data));
         return ppl::common::RC_SUCCESS;
     };
 
@@ -163,11 +162,11 @@ public:
         return src_;
     }
 
-    void set_src_shape(const ppl::nn::TensorShape* src_shape)
+    void set_src_shape(const ppl::common::TensorShape* src_shape)
     {
         src_shape_ = src_shape;
     }
-    const ppl::nn::TensorShape* src_shape() const
+    const ppl::common::TensorShape* src_shape() const
     {
         return src_shape_;
     };
@@ -181,11 +180,11 @@ public:
         return dst_;
     }
 
-    void set_dst_shape(const ppl::nn::TensorShape* dst_shape)
+    void set_dst_shape(const ppl::common::TensorShape* dst_shape)
     {
         dst_shape_ = dst_shape;
     }
-    const ppl::nn::TensorShape* dst_shape() const
+    const ppl::common::TensorShape* dst_shape() const
     {
         return dst_shape_;
     }

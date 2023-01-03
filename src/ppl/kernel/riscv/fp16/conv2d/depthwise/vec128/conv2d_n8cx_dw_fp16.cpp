@@ -17,7 +17,6 @@
 
 #include <cstring>
 #include "ppl/common/log.h"
-#include "ppl/nn/common/logger.h"
 #include "ppl/kernel/riscv/common/math.h"
 #include "ppl/kernel/riscv/fp16/conv2d/depthwise/vec128/conv2d_n8cx_dw_fp16.h"
 #include "ppl/kernel/riscv/fp16/conv2d/depthwise/vec128/conv2d_n8cx_dw_f3s1_kernel_fp16.cpp"
@@ -421,8 +420,8 @@ ppl::common::RetCode conv2d_n8cx_dw_fp16_offline_manager::pick_best_tunning_para
     const __fp16* src,
     const __fp16* filter,
     __fp16* dst,
-    ppl::nn::TensorShape& src_shape,
-    ppl::nn::TensorShape& dst_shape)
+    ppl::common::TensorShape& src_shape,
+    ppl::common::TensorShape& dst_shape)
 {
     return ppl::common::RC_SUCCESS;
 }

@@ -18,6 +18,7 @@
 #include <new>
 #include <chrono>
 
+#include "ppl/kernel/riscv/common/options.h"
 #include "ppl/kernel/riscv/fp32/conv2d/naive/conv2d_ndarray_naive_fp32.h"
 #include "ppl/kernel/riscv/fp32/conv2d/tile_gemm/vec128/conv2d_ndarray_tile_gemm_fp32_vec128.h"
 #include "ppl/kernel/riscv/fp32/conv2d/tile_gemm/vec128/conv2d_n4cx_tile_gemm_fp32_vec128.h"
@@ -35,7 +36,7 @@ using namespace ppl::common;
 
 namespace ppl { namespace kernel { namespace riscv {
 
-conv2d_common_algo_info conv2d_fp32_algo_selector::select_best_algo(const void* filter, ppl::nn::TensorShape& src_shape, ppl::nn::TensorShape& dst_shape, const conv2d_common_param& param, Allocator* allocator, const ppl::nn::riscv::EngineOptions* engine_options)
+conv2d_common_algo_info conv2d_fp32_algo_selector::select_best_algo(const void* filter, ppl::common::TensorShape& src_shape, ppl::common::TensorShape& dst_shape, const conv2d_common_param& param, Allocator* allocator, uint32_t winograd_level)
 {
     static conv2d_common_algo_info unknown_info =
         {conv2d_common_algo::unknown, DATAFORMAT_UNKNOWN, DATAFORMAT_UNKNOWN, DATATYPE_FLOAT32, DATATYPE_FLOAT32};
@@ -62,19 +63,19 @@ conv2d_common_algo_info conv2d_fp32_algo_selector::select_best_algo(const void* 
     } else if (DATAFORMAT_N4CX == src_shape.GetDataFormat()) {
         for (auto algo_info : n4cx_algo_info_lst) {
             if (algo_info.algo_type == conv2d_common_algo::winograd_b2f3) {
-                if ((ppl::nn::riscv::WG_ON != engine_options->winograd_level && ppl::nn::riscv::WG_ON_B2 != engine_options->winograd_level) ||
+                if ((ppl::kernel::riscv::WG_ON != winograd_level && ppl::kernel::riscv::WG_ON_B2 != winograd_level) ||
                     param.kernel_h != 3 || param.kernel_w != 3 || param.stride_h != 1 || param.stride_w != 1 ||
                     param.dilation_h != 1 || param.dilation_w != 1) {
                     continue;
                 }
             } else if (algo_info.algo_type == conv2d_common_algo::winograd_b4f3) {
-                if ((ppl::nn::riscv::WG_ON != engine_options->winograd_level && ppl::nn::riscv::WG_ON_B4 != engine_options->winograd_level) ||
+                if ((ppl::kernel::riscv::WG_ON != winograd_level && ppl::kernel::riscv::WG_ON_B4 != winograd_level) ||
                     param.kernel_h != 3 || param.kernel_w != 3 || param.stride_h != 1 || param.stride_w != 1 ||
                     param.dilation_h != 1 || param.dilation_w != 1) {
                     continue;
                 }
             } else if (algo_info.algo_type == conv2d_common_algo::winograd_b6f3) {
-                if ((ppl::nn::riscv::WG_ON != engine_options->winograd_level && ppl::nn::riscv::WG_ON_B6 != engine_options->winograd_level) ||
+                if ((ppl::kernel::riscv::WG_ON != winograd_level && ppl::kernel::riscv::WG_ON_B6 != winograd_level) ||
                     param.kernel_h != 3 || param.kernel_w != 3 || param.stride_h != 1 || param.stride_w != 1 ||
                     param.dilation_h != 1 || param.dilation_w != 1) {
                     continue;
@@ -121,14 +122,14 @@ conv2d_common_algo_info conv2d_fp32_algo_selector::select_best_algo(const void* 
 
     LOG(DEBUG) << "select best fp32 conv algo " << best_algo_info.algo_type;
     if (best_algo_info.algo_type == conv2d_common_algo::unknown) {
-        best_algo_info = select_algo(src_shape, param, engine_options);
+        best_algo_info = select_algo(src_shape, param, winograd_level);
     }
     return best_algo_info;
 }
 
-conv2d_common_algo_info conv2d_fp32_algo_selector::select_algo(const ppl::nn::TensorShape& input_shape,
+conv2d_common_algo_info conv2d_fp32_algo_selector::select_algo(const ppl::common::TensorShape& input_shape,
                                                                const conv2d_common_param& param,
-                                                               const ppl::nn::riscv::EngineOptions* engine_options)
+                                                               uint32_t winograd_level)
 {
     LOG(DEBUG) << "RISCV FP32 CONV select algo";
 
@@ -156,13 +157,13 @@ conv2d_common_algo_info conv2d_fp32_algo_selector::select_algo(const ppl::nn::Te
         if (param.kernel_h == 3 && param.kernel_w == 3 &&
             param.stride_h == 1 && param.stride_w == 1 &&
             param.dilation_h == 1 && param.dilation_w == 1) {
-            if (ppl::nn::riscv::WG_OFF == engine_options->winograd_level) {
+            if (ppl::kernel::riscv::WG_OFF == winograd_level) {
                 return {conv2d_common_algo::tile_gemm, DATAFORMAT_N4CX, DATAFORMAT_N4CX, DATATYPE_FLOAT32, DATATYPE_FLOAT32};
-            } else if (ppl::nn::riscv::WG_ON_B2 == engine_options->winograd_level) {
+            } else if (ppl::kernel::riscv::WG_ON_B2 == winograd_level) {
                 return {conv2d_common_algo::winograd_b2f3, DATAFORMAT_N4CX, DATAFORMAT_N4CX, DATATYPE_FLOAT32, DATATYPE_FLOAT32};
-            } else if (ppl::nn::riscv::WG_ON == engine_options->winograd_level || ppl::nn::riscv::WG_ON_B4 == engine_options->winograd_level) {
+            } else if (ppl::kernel::riscv::WG_ON == winograd_level || ppl::kernel::riscv::WG_ON_B4 == winograd_level) {
                 return {conv2d_common_algo::winograd_b4f3, DATAFORMAT_N4CX, DATAFORMAT_N4CX, DATATYPE_FLOAT32, DATATYPE_FLOAT32};
-            } else if (ppl::nn::riscv::WG_ON_B6 == engine_options->winograd_level) {
+            } else if (ppl::kernel::riscv::WG_ON_B6 == winograd_level) {
                 return {conv2d_common_algo::winograd_b6f3, DATAFORMAT_N4CX, DATAFORMAT_N4CX, DATATYPE_FLOAT32, DATATYPE_FLOAT32};
             }
         }

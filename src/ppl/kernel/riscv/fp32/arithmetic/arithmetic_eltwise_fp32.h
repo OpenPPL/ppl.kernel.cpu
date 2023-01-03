@@ -18,7 +18,7 @@
 #ifndef __ST_PPL_KERNEL_RISCV_FP32_ARITHMETIC_ARITHMETIC_ELTWISE_FP32_H_
 #define __ST_PPL_KERNEL_RISCV_FP32_ARITHMETIC_ARITHMETIC_ELTWISE_FP32_H_
 
-#include "ppl/nn/runtime/tensor_impl.h"
+#include "ppl/common/tensor_shape.h"
 #include "arithmetic_kernel_fp32.h"
 
 namespace ppl { namespace kernel { namespace riscv {
@@ -27,7 +27,7 @@ namespace ppl { namespace kernel { namespace riscv {
 
 template <arithmetic_op_type_t _op, bool fuse_relu>
 static ppl::common::RetCode arithmetic_eltwise_fp32(
-    const ppl::nn::TensorShape* dst_shape,
+    const ppl::common::TensorShape* dst_shape,
     const float* src0,
     const float* src1,
     float* dst)

@@ -21,8 +21,7 @@
 #include <string>
 #include <chrono>
 
-#include "ppl/nn/common/tensor_shape.h"
-#include "ppl/nn/runtime/tensor_impl.h"
+#include "ppl/common/tensor_shape.h"
 #include "ppl/common/retcode.h"
 #include "ppl/common/allocator.h"
 #include "ppl/common/sys.h"
@@ -107,8 +106,8 @@ public:
     virtual uint64_t cal_temp_buffer_size()                                      = 0;
     virtual ppl::common::RetCode prepare()                                       = 0;
     virtual ppl::common::RetCode execute()                                       = 0;
-    virtual ppl::common::RetCode set_src_tensor(ppl::nn::TensorImpl& src_tensor) = 0;
-    virtual ppl::common::RetCode set_dst_tensor(ppl::nn::TensorImpl& src_tensor) = 0;
+    virtual ppl::common::RetCode set_src_tensor(const ppl::common::TensorShape* src_shape, void* data) = 0;
+    virtual ppl::common::RetCode set_dst_tensor(const ppl::common::TensorShape* dst_shape, void* data) = 0;
     virtual void set_temp_buffer(void* temp_buffer)                              = 0;
 
     virtual ~conv2d_base_runtime_executor() {}
@@ -126,9 +125,9 @@ protected:
     T* dst_;
     const T* sum_src_;
 
-    const ppl::nn::TensorShape* src_shape_;
-    const ppl::nn::TensorShape* dst_shape_;
-    const ppl::nn::TensorShape* sum_src_shape_;
+    const ppl::common::TensorShape* src_shape_;
+    const ppl::common::TensorShape* dst_shape_;
+    const ppl::common::TensorShape* sum_src_shape_;
 
     void* temp_buffer_;
 
@@ -162,16 +161,16 @@ public:
     virtual ppl::common::RetCode execute()  = 0;
     virtual ~conv2d_runtime_executor() {}
 
-    virtual ppl::common::RetCode set_src_tensor(ppl::nn::TensorImpl& src_tensor) override
+    virtual ppl::common::RetCode set_src_tensor(const ppl::common::TensorShape* src_shape, void* data) override
     {
-        set_src_shape(src_tensor.GetShape());
-        set_src(src_tensor.GetBufferPtr<T>());
+        set_src_shape(src_shape);
+        set_src(reinterpret_cast<T *>(data));
         return ppl::common::RC_SUCCESS;
     };
-    virtual ppl::common::RetCode set_dst_tensor(ppl::nn::TensorImpl& dst_tensor) override
+    virtual ppl::common::RetCode set_dst_tensor(const ppl::common::TensorShape* dst_shape, void* data) override
     {
-        set_dst_shape(dst_tensor.GetShape());
-        set_dst(dst_tensor.GetBufferPtr<T>());
+        set_dst_shape(dst_shape);
+        set_dst(reinterpret_cast<T *>(data));
         return ppl::common::RC_SUCCESS;
     };
 
@@ -211,11 +210,11 @@ public:
         return src_;
     }
 
-    void set_src_shape(const ppl::nn::TensorShape* src_shape)
+    void set_src_shape(const ppl::common::TensorShape* src_shape)
     {
         src_shape_ = src_shape;
     }
-    const ppl::nn::TensorShape* src_shape() const
+    const ppl::common::TensorShape* src_shape() const
     {
         return src_shape_;
     };
@@ -229,11 +228,11 @@ public:
         return dst_;
     }
 
-    void set_dst_shape(const ppl::nn::TensorShape* dst_shape)
+    void set_dst_shape(const ppl::common::TensorShape* dst_shape)
     {
         dst_shape_ = dst_shape;
     }
-    const ppl::nn::TensorShape* dst_shape() const
+    const ppl::common::TensorShape* dst_shape() const
     {
         return dst_shape_;
     }
@@ -247,11 +246,11 @@ public:
         return sum_src_;
     }
 
-    void set_sum_src_shape(const ppl::nn::TensorShape* sum_src_shape)
+    void set_sum_src_shape(const ppl::common::TensorShape* sum_src_shape)
     {
         sum_src_shape_ = sum_src_shape;
     }
-    const ppl::nn::TensorShape* sum_src_shape() const
+    const ppl::common::TensorShape* sum_src_shape() const
     {
         return sum_src_shape_;
     }
@@ -379,13 +378,13 @@ public:
     }
 
     virtual ppl::common::RetCode fast_init_tunning_param()                                                                                                        = 0;
-    virtual ppl::common::RetCode pick_best_tunning_param(const T* src, const T* filter, T* dst, ppl::nn::TensorShape& src_shape, ppl::nn::TensorShape& dst_shape) = 0;
+    virtual ppl::common::RetCode pick_best_tunning_param(const T* src, const T* filter, T* dst, ppl::common::TensorShape& src_shape, ppl::common::TensorShape& dst_shape) = 0;
     virtual bool is_supported()                                                                                                                                   = 0;
     virtual ppl::common::RetCode gen_cvt_weights(const T* filter, const T* bias)                                                                                  = 0;
     virtual conv2d_base_runtime_executor* gen_executor()                                                                                                          = 0;
     virtual ~conv2d_offline_manager() {}
 
-    double profile_tunning_param(const T* src, const T* filter, T* dst, const ppl::nn::TensorShape& src_shape, const ppl::nn::TensorShape& dst_shape, const int32_t exe_count = 1)
+    double profile_tunning_param(const T* src, const T* filter, T* dst, const ppl::common::TensorShape& src_shape, const ppl::common::TensorShape& dst_shape, const int32_t exe_count = 1)
     {
         conv2d_offline_manager<T>& offline_manager = *this;
         std::vector<T> zero_bias(offline_manager.param().num_output, 0.0f);

@@ -18,12 +18,13 @@
 #include <riscv-vector.h>
 #include "ppl/kernel/riscv/common/internal_include.h"
 #include "ppl/kernel/riscv/common/averagepool2d/averagepool2d_common.h"
-#include "ppl/nn/params/onnx/pooling_param.h"
 #include "ppl/common/log.h"
 
 namespace ppl { namespace kernel { namespace riscv {
 
 #define C_BLK() 8
+
+enum { POOLING_MAX = 0, POOLING_AVERAGE_EXCLUDE = 1, POOLING_AVERAGE_INCLUDE = 2 };
 
 template <int32_t pooling_mode, int64_t w_len>
 static void averagepool2d_n8chw_1x16_kernel_fp16(
@@ -47,9 +48,9 @@ static void averagepool2d_n8chw_1x16_kernel_fp16(
     const int32_t iw_end_valid   = iw_start_valid + kernel_w;
 
     int64_t win_size = 0;
-    if (pooling_mode == ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_EXCLUDE) {
+    if (pooling_mode == POOLING_AVERAGE_EXCLUDE) {
         win_size = (ih_end_valid - ih_start_valid) * (iw_end_valid - iw_start_valid);
-    } else if (pooling_mode == ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_INCLUDE) {
+    } else if (pooling_mode == POOLING_AVERAGE_INCLUDE) {
         win_size = kernel_h * kernel_w;
     }
     __fp16 ave_divider = (__fp16)(1.0f / win_size);
@@ -212,38 +213,38 @@ static void averagepool2d_n8chw_1x16_kernel_fp16(
 
 typedef void (*averagepool2d_n8chw_kernel_fp16_func)(const __fp16*, __fp16*, const averagepool2d_param*, const int64_t, const int64_t, const int64_t, const int64_t);
 static const averagepool2d_n8chw_kernel_fp16_func averagepool2d_n8chw_1x16_kernel_select[2][16]{
-    {averagepool2d_n8chw_1x16_kernel_fp16<ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_INCLUDE, 1>,
-     averagepool2d_n8chw_1x16_kernel_fp16<ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_INCLUDE, 2>,
-     averagepool2d_n8chw_1x16_kernel_fp16<ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_INCLUDE, 3>,
-     averagepool2d_n8chw_1x16_kernel_fp16<ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_INCLUDE, 4>,
-     averagepool2d_n8chw_1x16_kernel_fp16<ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_INCLUDE, 5>,
-     averagepool2d_n8chw_1x16_kernel_fp16<ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_INCLUDE, 6>,
-     averagepool2d_n8chw_1x16_kernel_fp16<ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_INCLUDE, 7>,
-     averagepool2d_n8chw_1x16_kernel_fp16<ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_INCLUDE, 8>,
-     averagepool2d_n8chw_1x16_kernel_fp16<ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_INCLUDE, 9>,
-     averagepool2d_n8chw_1x16_kernel_fp16<ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_INCLUDE, 10>,
-     averagepool2d_n8chw_1x16_kernel_fp16<ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_INCLUDE, 11>,
-     averagepool2d_n8chw_1x16_kernel_fp16<ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_INCLUDE, 12>,
-     averagepool2d_n8chw_1x16_kernel_fp16<ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_INCLUDE, 13>,
-     averagepool2d_n8chw_1x16_kernel_fp16<ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_INCLUDE, 14>,
-     averagepool2d_n8chw_1x16_kernel_fp16<ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_INCLUDE, 15>,
-     averagepool2d_n8chw_1x16_kernel_fp16<ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_INCLUDE, 16>},
-    {averagepool2d_n8chw_1x16_kernel_fp16<ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_EXCLUDE, 1>,
-     averagepool2d_n8chw_1x16_kernel_fp16<ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_EXCLUDE, 2>,
-     averagepool2d_n8chw_1x16_kernel_fp16<ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_EXCLUDE, 3>,
-     averagepool2d_n8chw_1x16_kernel_fp16<ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_EXCLUDE, 4>,
-     averagepool2d_n8chw_1x16_kernel_fp16<ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_EXCLUDE, 5>,
-     averagepool2d_n8chw_1x16_kernel_fp16<ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_EXCLUDE, 6>,
-     averagepool2d_n8chw_1x16_kernel_fp16<ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_EXCLUDE, 7>,
-     averagepool2d_n8chw_1x16_kernel_fp16<ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_EXCLUDE, 8>,
-     averagepool2d_n8chw_1x16_kernel_fp16<ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_EXCLUDE, 9>,
-     averagepool2d_n8chw_1x16_kernel_fp16<ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_EXCLUDE, 10>,
-     averagepool2d_n8chw_1x16_kernel_fp16<ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_EXCLUDE, 11>,
-     averagepool2d_n8chw_1x16_kernel_fp16<ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_EXCLUDE, 12>,
-     averagepool2d_n8chw_1x16_kernel_fp16<ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_EXCLUDE, 13>,
-     averagepool2d_n8chw_1x16_kernel_fp16<ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_EXCLUDE, 14>,
-     averagepool2d_n8chw_1x16_kernel_fp16<ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_EXCLUDE, 15>,
-     averagepool2d_n8chw_1x16_kernel_fp16<ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_EXCLUDE, 16>}};
+    {averagepool2d_n8chw_1x16_kernel_fp16<POOLING_AVERAGE_INCLUDE, 1>,
+     averagepool2d_n8chw_1x16_kernel_fp16<POOLING_AVERAGE_INCLUDE, 2>,
+     averagepool2d_n8chw_1x16_kernel_fp16<POOLING_AVERAGE_INCLUDE, 3>,
+     averagepool2d_n8chw_1x16_kernel_fp16<POOLING_AVERAGE_INCLUDE, 4>,
+     averagepool2d_n8chw_1x16_kernel_fp16<POOLING_AVERAGE_INCLUDE, 5>,
+     averagepool2d_n8chw_1x16_kernel_fp16<POOLING_AVERAGE_INCLUDE, 6>,
+     averagepool2d_n8chw_1x16_kernel_fp16<POOLING_AVERAGE_INCLUDE, 7>,
+     averagepool2d_n8chw_1x16_kernel_fp16<POOLING_AVERAGE_INCLUDE, 8>,
+     averagepool2d_n8chw_1x16_kernel_fp16<POOLING_AVERAGE_INCLUDE, 9>,
+     averagepool2d_n8chw_1x16_kernel_fp16<POOLING_AVERAGE_INCLUDE, 10>,
+     averagepool2d_n8chw_1x16_kernel_fp16<POOLING_AVERAGE_INCLUDE, 11>,
+     averagepool2d_n8chw_1x16_kernel_fp16<POOLING_AVERAGE_INCLUDE, 12>,
+     averagepool2d_n8chw_1x16_kernel_fp16<POOLING_AVERAGE_INCLUDE, 13>,
+     averagepool2d_n8chw_1x16_kernel_fp16<POOLING_AVERAGE_INCLUDE, 14>,
+     averagepool2d_n8chw_1x16_kernel_fp16<POOLING_AVERAGE_INCLUDE, 15>,
+     averagepool2d_n8chw_1x16_kernel_fp16<POOLING_AVERAGE_INCLUDE, 16>},
+    {averagepool2d_n8chw_1x16_kernel_fp16<POOLING_AVERAGE_EXCLUDE, 1>,
+     averagepool2d_n8chw_1x16_kernel_fp16<POOLING_AVERAGE_EXCLUDE, 2>,
+     averagepool2d_n8chw_1x16_kernel_fp16<POOLING_AVERAGE_EXCLUDE, 3>,
+     averagepool2d_n8chw_1x16_kernel_fp16<POOLING_AVERAGE_EXCLUDE, 4>,
+     averagepool2d_n8chw_1x16_kernel_fp16<POOLING_AVERAGE_EXCLUDE, 5>,
+     averagepool2d_n8chw_1x16_kernel_fp16<POOLING_AVERAGE_EXCLUDE, 6>,
+     averagepool2d_n8chw_1x16_kernel_fp16<POOLING_AVERAGE_EXCLUDE, 7>,
+     averagepool2d_n8chw_1x16_kernel_fp16<POOLING_AVERAGE_EXCLUDE, 8>,
+     averagepool2d_n8chw_1x16_kernel_fp16<POOLING_AVERAGE_EXCLUDE, 9>,
+     averagepool2d_n8chw_1x16_kernel_fp16<POOLING_AVERAGE_EXCLUDE, 10>,
+     averagepool2d_n8chw_1x16_kernel_fp16<POOLING_AVERAGE_EXCLUDE, 11>,
+     averagepool2d_n8chw_1x16_kernel_fp16<POOLING_AVERAGE_EXCLUDE, 12>,
+     averagepool2d_n8chw_1x16_kernel_fp16<POOLING_AVERAGE_EXCLUDE, 13>,
+     averagepool2d_n8chw_1x16_kernel_fp16<POOLING_AVERAGE_EXCLUDE, 14>,
+     averagepool2d_n8chw_1x16_kernel_fp16<POOLING_AVERAGE_EXCLUDE, 15>,
+     averagepool2d_n8chw_1x16_kernel_fp16<POOLING_AVERAGE_EXCLUDE, 16>}};
 
 template <int32_t pooling_mode>
 static inline void averagepool2d_n8chw_border_fp16(
@@ -274,9 +275,9 @@ static inline void averagepool2d_n8chw_border_fp16(
     int64_t iw_end_valid   = min(iw_end, int64_t(src_w));
 
     int64_t win_size = 0;
-    if (pooling_mode == ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_EXCLUDE) {
+    if (pooling_mode == POOLING_AVERAGE_EXCLUDE) {
         win_size = (ih_end_valid - ih_start_valid) * (iw_end_valid - iw_start_valid);
-    } else if (pooling_mode == ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_INCLUDE) {
+    } else if (pooling_mode == POOLING_AVERAGE_INCLUDE) {
         win_size = kernel_h * kernel_w;
     }
     __fp16 ave_divider = (__fp16)(1.0f / win_size);
@@ -296,8 +297,8 @@ static inline void averagepool2d_n8chw_border_fp16(
 
 template <int32_t pooling_mode>
 ppl::common::RetCode averagepool2d_n8chw_1x16_fp16_impl(
-    const ppl::nn::TensorShape* src_shape,
-    const ppl::nn::TensorShape* dst_shape,
+    const ppl::common::TensorShape* src_shape,
+    const ppl::common::TensorShape* dst_shape,
     const int32_t kernel_h,
     const int32_t kernel_w,
     const int32_t stride_h,
@@ -335,15 +336,15 @@ ppl::common::RetCode averagepool2d_n8chw_1x16_fp16_impl(
                 averagepool2d_n8chw_border_fp16<pooling_mode>(src_, dst_, &param, oh, ow, ih_start_valid, ih_end_valid);
             }
             for (; ow + 16 <= dst_1x16_end_w; ow += 16) {
-                if (pooling_mode == ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_EXCLUDE)
+                if (pooling_mode == POOLING_AVERAGE_EXCLUDE)
                     averagepool2d_n8chw_1x16_kernel_select[1][15](src_, dst_, &param, oh, ow, ih_start_valid, ih_end_valid);
-                else if (pooling_mode == ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_INCLUDE)
+                else if (pooling_mode == POOLING_AVERAGE_INCLUDE)
                     averagepool2d_n8chw_1x16_kernel_select[0][15](src_, dst_, &param, oh, ow, ih_start_valid, ih_end_valid);
             }
             if (ow < dst_1x16_end_w) {
-                if (pooling_mode == ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_EXCLUDE)
+                if (pooling_mode == POOLING_AVERAGE_EXCLUDE)
                     averagepool2d_n8chw_1x16_kernel_select[1][dst_1x16_end_w - ow - 1](src_, dst_, &param, oh, ow, ih_start_valid, ih_end_valid);
-                else if (pooling_mode == ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_INCLUDE)
+                else if (pooling_mode == POOLING_AVERAGE_INCLUDE)
                     averagepool2d_n8chw_1x16_kernel_select[0][dst_1x16_end_w - ow - 1](src_, dst_, &param, oh, ow, ih_start_valid, ih_end_valid);
                 ow = dst_1x16_end_w;
             }
@@ -356,8 +357,8 @@ ppl::common::RetCode averagepool2d_n8chw_1x16_fp16_impl(
 }
 
 ppl::common::RetCode averagepool2d_n8chw_1x16_fp16(
-    const ppl::nn::TensorShape* src_shape,
-    const ppl::nn::TensorShape* dst_shape,
+    const ppl::common::TensorShape* src_shape,
+    const ppl::common::TensorShape* dst_shape,
     const int32_t kernel_h,
     const int32_t kernel_w,
     const int32_t stride_h,
@@ -369,11 +370,11 @@ ppl::common::RetCode averagepool2d_n8chw_1x16_fp16(
     const __fp16* src,
     __fp16* dst)
 {
-    if (pooling_mode == ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_EXCLUDE) {
-        return averagepool2d_n8chw_1x16_fp16_impl<ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_EXCLUDE>(
+    if (pooling_mode == POOLING_AVERAGE_EXCLUDE) {
+        return averagepool2d_n8chw_1x16_fp16_impl<POOLING_AVERAGE_EXCLUDE>(
             src_shape, dst_shape, kernel_h, kernel_w, stride_h, stride_w, pad_h, pad_w, src, dst);
-    } else if (pooling_mode == ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_INCLUDE) {
-        return averagepool2d_n8chw_1x16_fp16_impl<ppl::nn::onnx::PoolingParam::POOLING_AVERAGE_INCLUDE>(
+    } else if (pooling_mode == POOLING_AVERAGE_INCLUDE) {
+        return averagepool2d_n8chw_1x16_fp16_impl<POOLING_AVERAGE_INCLUDE>(
             src_shape, dst_shape, kernel_h, kernel_w, stride_h, stride_w, pad_h, pad_w, src, dst);
     }
 
@@ -381,8 +382,8 @@ ppl::common::RetCode averagepool2d_n8chw_1x16_fp16(
 }
 
 ppl::common::RetCode averagepool2d_n8chw_global_fp16(
-    const ppl::nn::TensorShape* src_shape,
-    const ppl::nn::TensorShape* dst_shape,
+    const ppl::common::TensorShape* src_shape,
+    const ppl::common::TensorShape* dst_shape,
 
     const __fp16* src,
     __fp16* dst)

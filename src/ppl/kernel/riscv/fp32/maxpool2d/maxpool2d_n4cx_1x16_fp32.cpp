@@ -17,7 +17,6 @@
 
 #include <riscv-vector.h>
 #include "ppl/kernel/riscv/common/internal_include.h"
-#include "ppl/nn/params/onnx/pooling_param.h"
 #include "ppl/kernel/riscv/common/maxpool2d/maxpool2d_common.h"
 
 namespace ppl { namespace kernel { namespace riscv {
@@ -169,8 +168,8 @@ static inline void maxpool2d_n4cx_border_fp32(
 }
 
 ppl::common::RetCode maxpool2d_n4cx_1x16_fp32(
-    const ppl::nn::TensorShape* src_shape,
-    const ppl::nn::TensorShape* dst_shape,
+    const ppl::common::TensorShape* src_shape,
+    const ppl::common::TensorShape* dst_shape,
     const int32_t kernel_h,
     const int32_t kernel_w,
     const int32_t stride_h,

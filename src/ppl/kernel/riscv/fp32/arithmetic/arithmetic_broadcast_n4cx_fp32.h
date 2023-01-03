@@ -18,7 +18,7 @@
 #ifndef __ST_PPL_KERNEL_RISCV_FP32_ARITHMETIC_ARITHMETIC_BROADCAST_N4CX_FP32_H_
 #define __ST_PPL_KERNEL_RISCV_FP32_ARITHMETIC_ARITHMETIC_BROADCAST_N4CX_FP32_H_
 
-#include "ppl/nn/runtime/tensor_impl.h"
+#include "ppl/common/tensor_shape.h"
 #include "arithmetic_kernel_fp32.h"
 
 namespace ppl { namespace kernel { namespace riscv {
@@ -421,9 +421,9 @@ static ppl::common::RetCode arithmetic_broadcast_n4cx_fp32(
     const float* src1,
     float* dst,
 
-    const ppl::nn::TensorShape* src0_shape,
-    const ppl::nn::TensorShape* src1_shape,
-    const ppl::nn::TensorShape* dst_shape,
+    const ppl::common::TensorShape* src0_shape,
+    const ppl::common::TensorShape* src1_shape,
+    const ppl::common::TensorShape* dst_shape,
     const int64_t c_dim_dix)
 {
     // pad 1 to input's high dims

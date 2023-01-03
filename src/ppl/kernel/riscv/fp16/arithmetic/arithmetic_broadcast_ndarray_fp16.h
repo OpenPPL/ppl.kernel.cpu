@@ -18,7 +18,7 @@
 #ifndef __ST_PPL_KERNEL_RISCV_FP16_ARITHMETIC_ARITHMETIC_BROADCAST_NDARRAY_FP16_H_
 #define __ST_PPL_KERNEL_RISCV_FP16_ARITHMETIC_ARITHMETIC_BROADCAST_NDARRAY_FP16_H_
 
-#include "ppl/nn/runtime/tensor_impl.h"
+#include "ppl/common/tensor_shape.h"
 #include "arithmetic_kernel_fp16.h"
 #include <cmath>
 
@@ -378,9 +378,9 @@ static ppl::common::RetCode arithmetic_broadcast_ndarray_fp16(
     const __fp16* src1,
     __fp16* dst,
 
-    const ppl::nn::TensorShape* src0_shape,
-    const ppl::nn::TensorShape* src1_shape,
-    const ppl::nn::TensorShape* dst_shape)
+    const ppl::common::TensorShape* src0_shape,
+    const ppl::common::TensorShape* src1_shape,
+    const ppl::common::TensorShape* dst_shape)
 {
     // pad 1 to input's high dims
     const int64_t dim_count = dst_shape->GetDimCount();
