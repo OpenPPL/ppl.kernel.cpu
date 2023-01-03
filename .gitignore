@@ -1,0 +1,9 @@
+.vscode
+.DS_Store
+build
+deps
+target
+install
+x86-build
+pplnn-build
+html
