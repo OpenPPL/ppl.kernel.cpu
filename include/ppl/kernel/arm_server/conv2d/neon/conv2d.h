@@ -152,6 +152,7 @@ protected:
     void *dst_;
     const ppl::common::TensorShape *dst_shape_;
     void *sum_;
+    void *slope_;
     void *temp_buffer_;
 
 public:
@@ -164,6 +165,7 @@ public:
         , dst_(nullptr)
         , dst_shape_(nullptr)
         , sum_(nullptr)
+        , slope_(nullptr)
         , temp_buffer_(nullptr) {}
 
     conv2d_runtime_executor(const conv2d_param *conv_param, const void *cvt_filter, const void *cvt_bias)
@@ -175,6 +177,7 @@ public:
         , dst_(nullptr)
         , dst_shape_(nullptr)
         , sum_(nullptr)
+        , slope_(nullptr)
         , temp_buffer_(nullptr) {}
 
     virtual uint64_t cal_temp_buffer_size() = 0;
@@ -262,6 +265,15 @@ public:
     void *sum() const
     {
         return sum_;
+    }
+
+    void set_slope(void *slope)
+    {
+        slope_ = slope;
+    }
+    void *slope() const
+    {
+        return slope_;
     }
 
     void set_temp_buffer(void *temp_buffer)
