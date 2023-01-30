@@ -160,6 +160,8 @@ ppl::common::RetCode conv2d_n16cx_gemm_direct_fp32_fma_executor::execute()
     const int64_t batch         = src_shape_->GetDim(0);
     const int64_t src_h         = src_shape_->GetDim(2);
     const int64_t src_w         = src_shape_->GetDim(3);
+    const int64_t dst_h         = dst_shape_->GetDim(2);
+    const int64_t dst_w         = dst_shape_->GetDim(3);
     const int64_t dst_space     = dst_shape_->GetDim(2) * dst_shape_->GetDim(3);
     const int64_t padded_reg_oc = round_up(sp.oc_per_grp, OC_REG_ELTS);
 
@@ -231,24 +233,24 @@ ppl::common::RetCode conv2d_n16cx_gemm_direct_fp32_fma_executor::execute()
                     const int64_t src_trans_b_stride   = int64_t(sp.ic_l2_blk) * dst_space;
                     const int64_t src_trans_g_stride   = int64_t(sp.mb_l3_blk) * sp.ic_l2_blk * dst_space;
                     const int64_t src_trans_icb_stride = int64_t(dst_space) * IC_DATA_BLK;
+                    const int64_t src_trans_h_stride   = int64_t(dst_w) * IC_DATA_BLK;
                     float *src_trans                   = reinterpret_cast<float*>(temp_buffer_);
 #ifdef PPL_USE_X86_OMP_COLLAPSE
-                    PRAGMA_OMP_FOR_COLLAPSE(3)
+                    PRAGMA_OMP_FOR_COLLAPSE(4)
 #endif
                     for (int64_t g = 0; g < grpl3_eff; ++g) {
+                        for (int64_t b = 0; b < mbl3_eff; ++b) {
 #ifndef PPL_USE_X86_OMP_COLLAPSE
                         PRAGMA_OMP_FOR()
 #endif
-                        for (int64_t b = 0; b < mbl3_eff; ++b) {
                             for (int64_t icb = 0; icb < div_up(icl2_eff, IC_DATA_BLK); ++icb) {
-                                const float *l_base_src = base_src + g * base_src_g_stride + b * base_src_b_stride + icb * base_src_icb_stride;
-                                float *l_src_trans      = src_trans + g * src_trans_g_stride + b * src_trans_b_stride + icb * src_trans_icb_stride;
-                                for (int64_t ih = 0; ih < src_h; ih += cp.stride_h) {
+                                for (int64_t oh = 0; oh < dst_h; ++oh) {
+                                    const float *l_base_src = base_src + g * base_src_g_stride + b * base_src_b_stride + icb * base_src_icb_stride + oh * cp.stride_h * src_h_stride;
+                                    float *l_src_trans      = src_trans + g * src_trans_g_stride + b * src_trans_b_stride + icb * src_trans_icb_stride + oh * src_trans_h_stride;
                                     for (int64_t iw = 0; iw < src_w; iw += cp.stride_w) {
                                         memcpy32_avx(l_src_trans, l_base_src + iw * IC_DATA_BLK, IC_DATA_BLK);
                                         l_src_trans += IC_DATA_BLK;
                                     }
-                                    l_base_src += cp.stride_h * src_h_stride;
                                 }
                             }
                         }

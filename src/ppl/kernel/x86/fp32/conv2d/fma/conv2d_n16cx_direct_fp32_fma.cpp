@@ -267,14 +267,13 @@ ppl::common::RetCode conv2d_n16cx_direct_fp32_fma_executor::execute()
                 int64_t his_b_stride        = dst_b_stride;
                 uint64_t kernel_flags       = 0;
                 if (is_first_ic) {
-                    kernel_flags |= ker_flag::BIAS;
                     if (with_sum) {
                         base_his     = sum_src_;
                         his_b_stride = sum_src_b_stride;
-                        kernel_flags |= ker_flag::HIS;
+                        kernel_flags |= ker_flag::ADD_BIAS;
+                    } else {
+                        kernel_flags |= ker_flag::LOAD_BIAS;
                     }
-                } else {
-                    kernel_flags |= ker_flag::HIS;
                 }
                 if (is_last_ic) {
                     if (with_relu) {
