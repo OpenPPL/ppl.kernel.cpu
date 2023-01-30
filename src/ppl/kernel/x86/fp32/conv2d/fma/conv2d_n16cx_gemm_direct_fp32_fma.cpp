@@ -180,6 +180,13 @@ ppl::common::RetCode conv2d_n16cx_gemm_direct_fp32_fma_executor::execute()
         sum_src_b_stride = int64_t(round_up(sum_src_shape_->GetDim(1), OC_DATA_BLK)) * dst_space;
     }
 
+    PRAGMA_OMP_PARALLEL()
+    {
+
+    int64_t ker_param[conv2d_n16cx_gemm_direct_kernel_fp32_fma::param_def::LENGTH];
+    array_param_helper ker_p(ker_param);
+    conv2d_n16cx_gemm_direct_kernel_fp32_fma ker(ker_param);
+
     for (int64_t mbl3 = 0; mbl3 < batch; mbl3 += sp.mb_l3_blk) {
         const int64_t mbl3_eff = min(batch - mbl3, sp.mb_l3_blk);
         for (int64_t grpl3 = 0; grpl3 < cp.group; grpl3 += sp.grp_l3_blk) {
@@ -226,11 +233,11 @@ ppl::common::RetCode conv2d_n16cx_gemm_direct_fp32_fma_executor::execute()
                     const int64_t src_trans_icb_stride = int64_t(dst_space) * IC_DATA_BLK;
                     float *src_trans                   = reinterpret_cast<float*>(temp_buffer_);
 #ifdef PPL_USE_X86_OMP_COLLAPSE
-                    PRAGMA_OMP_PARALLEL_FOR_COLLAPSE(3)
+                    PRAGMA_OMP_FOR_COLLAPSE(3)
 #endif
                     for (int64_t g = 0; g < grpl3_eff; ++g) {
 #ifndef PPL_USE_X86_OMP_COLLAPSE
-                        PRAGMA_OMP_PARALLEL_FOR()
+                        PRAGMA_OMP_FOR()
 #endif
                         for (int64_t b = 0; b < mbl3_eff; ++b) {
                             for (int64_t icb = 0; icb < div_up(icl2_eff, IC_DATA_BLK); ++icb) {
@@ -252,18 +259,15 @@ ppl::common::RetCode conv2d_n16cx_gemm_direct_fp32_fma_executor::execute()
                     base_src_icb_stride = src_trans_icb_stride;
                 }
 #ifdef PPL_USE_X86_OMP_COLLAPSE
-                PRAGMA_OMP_PARALLEL_FOR_COLLAPSE(4)
+                PRAGMA_OMP_FOR_COLLAPSE(4)
 #endif
                 for (int64_t g = 0; g < grpl3_eff; ++g) {
                     for (int64_t b = 0; b < mbl3_eff; ++b) {
 #ifndef PPL_USE_X86_OMP_COLLAPSE
-                        PRAGMA_OMP_PARALLEL_FOR()
+                        PRAGMA_OMP_FOR()
 #endif
                         for (int64_t ocl2 = 0; ocl2 < padded_reg_oc; ocl2 += sp.oc_l2_blk) {
                             for (int64_t sl2 = 0; sl2 < dst_space; sl2 += sp.s_l2_blk) {
-                                int64_t ker_param[conv2d_n16cx_gemm_direct_kernel_fp32_fma::param_def::LENGTH];
-                                array_param_helper ker_p(ker_param);
-                                conv2d_n16cx_gemm_direct_kernel_fp32_fma ker(ker_param);
                                 ker_p.pick<int64_t>(conv2d_n16cx_gemm_direct_kernel_fp32_fma::param_def::SRC_ICB_STRIDE_IDX) = base_src_icb_stride;
                                 ker_p.pick<int64_t>(conv2d_n16cx_gemm_direct_kernel_fp32_fma::param_def::CHANNELS_IDX)       = icl2_eff;
                                 ker_p.pick<int64_t>(conv2d_n16cx_gemm_direct_kernel_fp32_fma::param_def::FLAGS_IDX)          = kernel_flags;
@@ -309,13 +313,12 @@ ppl::common::RetCode conv2d_n16cx_gemm_direct_fp32_fma_executor::execute()
                 }
             }
             if (sp.use_nt_store) {
-                PRAGMA_OMP_PARALLEL()
-                {
-                    _mm_sfence();
-                }
+                _mm_sfence();
             }
         }
     }
+
+    } // OMP_PARALLEL
 
     return ppl::common::RC_SUCCESS;
 }
