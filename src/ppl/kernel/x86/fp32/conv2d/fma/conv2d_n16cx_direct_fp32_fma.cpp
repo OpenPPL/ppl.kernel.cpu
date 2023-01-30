@@ -15,7 +15,6 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include <new>
 #include <immintrin.h>
 #include <string.h>
 
@@ -23,36 +22,45 @@
 #include "ppl/kernel/x86/common/avx_tools.h"
 #include "ppl/kernel/x86/fp32/conv2d/fma/conv2d_n16cx_direct_fp32_fma.h"
 #include "ppl/kernel/x86/fp32/conv2d/fma/conv2d_n16cx_direct_kernel_fp32_fma.h"
-
-#define ASSUME_L2_BYTES() (256 * 1024)
-#define ASSUME_L2_WAYS()  4
-#define ASSUME_L3_BYTES() (2048 * 1024)
-#define L2_RATIO()        0.251
-#define L3_RATIO()        0.501
-
-#define IC_L2_BLK_MAX()        (16 * CH_DT_BLK())
-#define IC_L2_BLK_TAIL_RATIO() 0.334
-#define OC_L2_BLK_MAX()        (4 * CH_DT_BLK())
-#define OW_L2_BLK_MAX()        96
-
-#define PADDING_POLICY_NOPAD() 0
-#define PADDING_POLICY_PREPAD() 1
+#include "ppl/kernel/x86/common/array_param_helper.h"
 
 namespace ppl { namespace kernel { namespace x86 {
+
+static const int64_t ASSUME_L2_BYTES = 256 * 1024;
+static const int64_t ASSUME_L2_WAYS = 4;
+static const int64_t ASSUME_L3_BYTES = 2048 * 1024;
+static const float L2_RATIO = 0.251f;
+static const float L3_RATIO = 0.501f;
+
+typedef conv2d_n16cx_direct_kernel_fp32_fma::param_def ker_p_def;
+typedef conv2d_n16cx_direct_kernel_fp32_fma::config ker_cfg;
+typedef conv2d_n16cx_direct_kernel_fp32_fma::flag ker_flag;
+
+static const int64_t IC_DATA_BLK = conv2d_n16cx_direct_kernel_fp32_fma::config::IC_DATA_BLK;
+static const int64_t OC_DATA_BLK = conv2d_n16cx_direct_kernel_fp32_fma::config::OC_DATA_BLK;
+static const int64_t OC_REG_ELTS = conv2d_n16cx_direct_kernel_fp32_fma::config::OC_REG_ELTS;
+
+static const int64_t IC_L2_BLK_MAX = 16 * IC_DATA_BLK;
+static const float IC_L2_BLK_TAIL_RATIO = 0.334f;
+static const int64_t OC_L2_BLK_MAX = 4 * OC_DATA_BLK;
+static const int64_t OW_L2_BLK_MAX = 16 * ker_cfg::MAX_W_BLK;
+
+static const int64_t PADDING_POLICY_NOPAD = 0;
+static const int64_t PADDING_POLICY_PREPAD = 1;
 
 int64_t conv2d_n16cx_direct_fp32_fma_executor::cal_ic_l2_blk(const conv2d_param &param)
 {
     const int64_t ic_per_gp = param.channels / param.group;
-    const int64_t padded_ic = round_up(ic_per_gp, CH_DT_BLK());
+    const int64_t padded_ic = round_up(ic_per_gp, IC_DATA_BLK);
 
     int64_t ic_l2_blk;
-    if (padded_ic >= IC_L2_BLK_MAX()) {
-        ic_l2_blk = min<int64_t>(div_up(4 * IC_L2_BLK_MAX(), param.kernel_h * param.kernel_w * CH_DT_BLK()) * CH_DT_BLK(), padded_ic);
+    if (padded_ic >= IC_L2_BLK_MAX) {
+        ic_l2_blk = min<int64_t>(div_up(4 * IC_L2_BLK_MAX, param.kernel_h * param.kernel_w * IC_DATA_BLK) * OC_DATA_BLK, padded_ic);
     } else {
-        ic_l2_blk = min<int64_t>(div_up(IC_L2_BLK_MAX(), param.kernel_h * param.kernel_w * CH_DT_BLK()) * CH_DT_BLK(), padded_ic);
+        ic_l2_blk = min<int64_t>(div_up(IC_L2_BLK_MAX, param.kernel_h * param.kernel_w * IC_DATA_BLK) * OC_DATA_BLK, padded_ic);
     }
-    if (mod_up(padded_ic, ic_l2_blk) < IC_L2_BLK_TAIL_RATIO() * ic_l2_blk) {
-        ic_l2_blk = round_up(padded_ic / (padded_ic / ic_l2_blk), CH_DT_BLK());
+    if (mod_up(padded_ic, ic_l2_blk) < IC_L2_BLK_TAIL_RATIO * ic_l2_blk) {
+        ic_l2_blk = round_up(padded_ic / (padded_ic / ic_l2_blk), IC_DATA_BLK);
     }
 
     return ic_l2_blk;
@@ -62,8 +70,8 @@ void conv2d_n16cx_direct_fp32_fma_executor::init_preproc_param()
 {
     schedule_param_.ic_per_gp = conv_param_->channels / conv_param_->group;
     schedule_param_.oc_per_gp = conv_param_->num_output / conv_param_->group;
-    schedule_param_.padded_ic = round_up(schedule_param_.ic_per_gp, CH_DT_BLK());
-    schedule_param_.padded_oc = round_up(schedule_param_.oc_per_gp, CH_DT_BLK());
+    schedule_param_.padded_ic = round_up(schedule_param_.ic_per_gp, IC_DATA_BLK);
+    schedule_param_.padded_oc = round_up(schedule_param_.oc_per_gp, OC_DATA_BLK);
 }
 
 void conv2d_n16cx_direct_fp32_fma_executor::cal_kernel_tunning_param()
@@ -80,7 +88,7 @@ void conv2d_n16cx_direct_fp32_fma_executor::cal_kernel_tunning_param()
     const int64_t dst_w        = dst_shape_->GetDim(3);
     const int64_t ext_kernel_w = (cp.kernel_w - 1) * cp.dilation_w + 1;
 
-    const float l3_cap_all_core = (ppl::common::GetCpuCacheL3() == 0 ? (ASSUME_L3_BYTES() * num_thread) : ppl::common::GetCpuCacheL3()) * L3_RATIO() / sizeof(float);
+    const float l3_cap_all_core = (ppl::common::GetCpuCacheL3() == 0 ? (ASSUME_L3_BYTES * num_thread) : ppl::common::GetCpuCacheL3()) * L3_RATIO / sizeof(float);
 
     sp.ic_l2_blk = cal_ic_l2_blk(cp);
     sp.ic_l2_cnt = div_up(sp.padded_ic, sp.ic_l2_blk);
@@ -91,13 +99,13 @@ void conv2d_n16cx_direct_fp32_fma_executor::cal_kernel_tunning_param()
     if (dst_h <= 112 && dst_w <= 112
         && cp.stride_w < dst_w && cp.pad_w != 0
         && cp.dilation_w < dst_w
-        && !(channels / cp.group <= CH_DT_BLK() && cp.group >= PPL_OMP_MAX_THREADS())) {
-        sp.padding_policy = PADDING_POLICY_PREPAD();
+        && !(channels / cp.group <= IC_DATA_BLK && cp.group >= PPL_OMP_MAX_THREADS())) {
+        sp.padding_policy = PADDING_POLICY_PREPAD;
     } else {
-        sp.padding_policy = PADDING_POLICY_NOPAD();
+        sp.padding_policy = PADDING_POLICY_NOPAD;
     }
 
-    if (sp.padding_policy == PADDING_POLICY_PREPAD()) {
+    if (sp.padding_policy == PADDING_POLICY_PREPAD) {
         const int64_t padded_src_hw = int64_t(src_h) * (src_w + 2 * cp.pad_w);
         while (sp.gp_l3_blk > 1 && sp.gp_l3_blk * sp.mb_l3_blk * sp.ic_l2_blk * padded_src_hw > l3_cap_all_core) {
             --sp.gp_l3_blk;
@@ -110,7 +118,7 @@ void conv2d_n16cx_direct_fp32_fma_executor::cal_kernel_tunning_param()
 
     sp.unroll_ow_start = -1;
     sp.unroll_ow_end = -1;
-    if (sp.padding_policy == PADDING_POLICY_NOPAD()) {
+    if (sp.padding_policy == PADDING_POLICY_NOPAD) {
         for (int64_t ow = 0; ow < dst_w; ++ow) {
             if (ow * cp.stride_w - cp.pad_w >= 0) {
                 sp.unroll_ow_start = ow;
@@ -132,10 +140,10 @@ void conv2d_n16cx_direct_fp32_fma_executor::cal_kernel_tunning_param()
     }
 
     if (sp.unroll_ow_start < sp.unroll_ow_end) {
-        sp.ow_kr_blk = min<int64_t>(sp.unroll_ow_end - sp.unroll_ow_start, MAX_OW_RF());
+        sp.ow_kr_blk = min<int64_t>(sp.unroll_ow_end - sp.unroll_ow_start, ker_cfg::MAX_W_BLK);
 #define REDUN_W(W, W_BLK) (float(round_up(W, W_BLK)) / (W)-1.0f)
         if (REDUN_W(dst_w, sp.ow_kr_blk) > 0.201f) {
-            for (int32_t ow_blk = MAX_OW_RF(); ow_blk >= MAX_OW_RF() - 2; --ow_blk) {
+            for (int32_t ow_blk = ker_cfg::MAX_W_BLK; ow_blk >= ker_cfg::MAX_W_BLK - 2; --ow_blk) {
                 if (REDUN_W(dst_w, ow_blk) < REDUN_W(dst_w, sp.ow_kr_blk)) {
                     sp.ow_kr_blk = ow_blk;
                 }
@@ -143,13 +151,13 @@ void conv2d_n16cx_direct_fp32_fma_executor::cal_kernel_tunning_param()
         }
 #undef REDUN_W
     } else {
-        sp.ow_kr_blk = MAX_OW_RF();
+        sp.ow_kr_blk = ker_cfg::MAX_W_BLK;
     }
 
-    sp.oc_l2_blk = min<int64_t>(OC_L2_BLK_MAX(), sp.padded_oc);
+    sp.oc_l2_blk = min<int64_t>(OC_L2_BLK_MAX, sp.padded_oc);
     sp.ow_l2_blk = dst_w;
-    if (sp.ow_l2_blk >= 2 * OW_L2_BLK_MAX()) sp.ow_l2_blk = round_up(OW_L2_BLK_MAX(), sp.ow_kr_blk);
-    else if (sp.ow_l2_blk > 1.5 * OW_L2_BLK_MAX()) sp.ow_l2_blk = round_up(div_up(sp.ow_l2_blk, 2), sp.ow_kr_blk);
+    if (sp.ow_l2_blk >= 2 * OW_L2_BLK_MAX) sp.ow_l2_blk = round_up(OW_L2_BLK_MAX, sp.ow_kr_blk);
+    else if (sp.ow_l2_blk > 1.5 * OW_L2_BLK_MAX) sp.ow_l2_blk = round_up(div_up(sp.ow_l2_blk, 2), sp.ow_kr_blk);
 
     sp.use_nt_store = 0;
     if (batch * cp.group * sp.padded_oc * dst_h * dst_w > l3_cap_all_core * 2) {
@@ -159,7 +167,7 @@ void conv2d_n16cx_direct_fp32_fma_executor::cal_kernel_tunning_param()
 
 uint64_t conv2d_n16cx_direct_fp32_fma_executor::cal_temp_buffer_size()
 {
-    if (schedule_param_.padding_policy == PADDING_POLICY_PREPAD()) {
+    if (schedule_param_.padding_policy == PADDING_POLICY_PREPAD) {
         const int64_t src_h          = src_shape_->GetDim(2);
         const int64_t src_w          = src_shape_->GetDim(3);
         const uint64_t padded_src_hw = uint64_t(src_h) * (src_w + 2 * conv_param_->pad_w);
@@ -189,7 +197,7 @@ ppl::common::RetCode conv2d_n16cx_direct_fp32_fma_executor::execute()
     const conv2d_param &cp     = *conv_param_;
     const kernel_schedule_param &sp = schedule_param_;
 
-    if (sp.padding_policy == PADDING_POLICY_PREPAD() && !temp_buffer_) {
+    if (sp.padding_policy == PADDING_POLICY_PREPAD && !temp_buffer_) {
         return ppl::common::RC_INVALID_VALUE;
     }
 
@@ -201,18 +209,18 @@ ppl::common::RetCode conv2d_n16cx_direct_fp32_fma_executor::execute()
 
     const int64_t ext_kernel_h = (cp.kernel_h - 1) * cp.dilation_h + 1;
     const int64_t ext_kernel_w = (cp.kernel_w - 1) * cp.dilation_w + 1;
-    const int64_t padded_reg_oc = round_up(sp.oc_per_gp, CH_RF_BLK());
+    const int64_t padded_reg_oc = round_up(sp.oc_per_gp, OC_REG_ELTS);
 
-    const int64_t src_b_stride   = round_up(src_shape_->GetDim(1), CH_DT_BLK()) * src_h * src_w;
+    const int64_t src_b_stride   = round_up(src_shape_->GetDim(1), IC_DATA_BLK) * src_h * src_w;
     const int64_t src_g_stride   = sp.padded_ic * src_h * src_w;
-    const int64_t src_icb_stride = src_h * src_w * CH_DT_BLK();
-    const int64_t src_h_stride   = src_w * CH_DT_BLK();
-    const int64_t src_sw_stride  = cp.stride_w * CH_DT_BLK();
-    const int64_t src_dh_stride  = cp.dilation_h * src_w * CH_DT_BLK();
-    const int64_t src_dw_stride  = cp.dilation_w * CH_DT_BLK();
-    const int64_t dst_b_stride   = round_up(dst_shape_->GetDim(1), CH_DT_BLK()) * dst_h * dst_w;
+    const int64_t src_icb_stride = src_h * src_w * IC_DATA_BLK;
+    const int64_t src_h_stride   = src_w * IC_DATA_BLK;
+    const int64_t src_sw_stride  = cp.stride_w * IC_DATA_BLK;
+    const int64_t src_dh_stride  = cp.dilation_h * src_w * IC_DATA_BLK;
+    const int64_t src_dw_stride  = cp.dilation_w * IC_DATA_BLK;
+    const int64_t dst_b_stride   = round_up(dst_shape_->GetDim(1), OC_DATA_BLK) * dst_h * dst_w;
     const int64_t dst_g_stride   = sp.padded_oc * dst_h * dst_w;
-    const int64_t dst_h_stride   = dst_w * CH_DT_BLK();
+    const int64_t dst_h_stride   = dst_w * OC_DATA_BLK;
     const int64_t flt_g_stride   = sp.ic_l2_cnt * sp.padded_oc * cp.kernel_h * cp.kernel_w * sp.ic_l2_blk;
 
     const bool with_sum   = cp.fuse_flag & conv_fuse_flag::SUM;
@@ -221,16 +229,23 @@ ppl::common::RetCode conv2d_n16cx_direct_fp32_fma_executor::execute()
 
     int64_t sum_src_b_stride = 0;
     if (with_sum) {
-        sum_src_b_stride = int64_t(round_up(sum_src_shape_->GetDim(1), CH_DT_BLK())) * dst_h * dst_w;
+        sum_src_b_stride = int64_t(round_up(sum_src_shape_->GetDim(1), OC_DATA_BLK)) * dst_h * dst_w;
     }
 
     PRAGMA_OMP_PARALLEL()
     {
-    int64_t share_param[SHAR_PARAM_LEN()];
-    share_param[KH_IDX()] = cp.kernel_h;
-    share_param[KW_IDX()] = cp.kernel_w;
-    const int64_t nt_store_sel = sp.use_nt_store;
-    const int64_t stride_w_sel = cp.stride_w > 2 ? 0 : cp.stride_w;
+
+    int64_t ker_param[ker_p_def::LENGTH];
+    array_param_helper ker_p(ker_param);
+    conv2d_n16cx_direct_kernel_fp32_fma ker(ker_param);
+
+    ker_p.pick<int64_t>(ker_p_def::KH_IDX) = cp.kernel_h;
+    ker_p.pick<int64_t>(ker_p_def::KW_IDX) = cp.kernel_w;
+    ker_p.pick<int64_t>(ker_p_def::SRC_DW_STRIDE_IDX) = src_dw_stride;
+    ker_p.pick<int64_t>(ker_p_def::SRC_SW_STRIDE_IDX) = src_sw_stride;
+
+    const int64_t spec_stride_w = cp.stride_w > 2 ? 0 : cp.stride_w;
+
     for (int64_t mbl3 = 0; mbl3 < batch; mbl3 += sp.mb_l3_blk) {
         const int64_t mbl3_eff = min<int64_t>(batch - mbl3, sp.mb_l3_blk);
         for (int64_t gpl3 = 0; gpl3 < cp.group; gpl3 += sp.gp_l3_blk) {
@@ -250,21 +265,22 @@ ppl::common::RetCode conv2d_n16cx_direct_fp32_fma_executor::execute()
                 int64_t base_src_h_stride   = src_h_stride;
                 int64_t base_src_dh_stride  = src_dh_stride;
                 int64_t his_b_stride        = dst_b_stride;
-                uint64_t kernel_flags = 0;
+                uint64_t kernel_flags       = 0;
                 if (is_first_ic) {
+                    kernel_flags |= ker_flag::BIAS;
                     if (with_sum) {
                         base_his     = sum_src_;
                         his_b_stride = sum_src_b_stride;
-                        kernel_flags |= KERNEL_FLAG_AD_BIAS();
-                    } else {
-                        kernel_flags |= KERNEL_FLAG_LD_BIAS();
+                        kernel_flags |= ker_flag::HIS;
                     }
+                } else {
+                    kernel_flags |= ker_flag::HIS;
                 }
                 if (is_last_ic) {
                     if (with_relu) {
-                        kernel_flags |= KERNEL_FLAG_RELU();
+                        kernel_flags |= ker_flag::RELU;
                     } else if (with_relu6) {
-                        kernel_flags |= KERNEL_FLAG_RELU6();
+                        kernel_flags |= ker_flag::RELU6;
                     }
                 }
                 base_src += mbl3 * base_src_b_stride + gpl3 * base_src_g_stride + icl2 * src_h * src_w;
@@ -272,50 +288,47 @@ ppl::common::RetCode conv2d_n16cx_direct_fp32_fma_executor::execute()
                 base_his += mbl3 * his_b_stride + gpl3 * dst_g_stride;
                 base_flt += gpl3 * flt_g_stride + icl2 * sp.padded_oc * cp.kernel_h * cp.kernel_w;
 
-                if (sp.padding_policy == PADDING_POLICY_PREPAD()) {
+                if (sp.padding_policy == PADDING_POLICY_PREPAD) {
                     const int64_t src_trans_w          = src_w + 2 * cp.pad_w;
                     const int64_t src_trans_b_stride   = int64_t(sp.ic_l2_blk) * src_h * src_trans_w;
                     const int64_t src_trans_g_stride   = int64_t(sp.mb_l3_blk) * sp.ic_l2_blk * src_h * src_trans_w;
-                    const int64_t src_trans_icb_stride = int64_t(src_h) * src_trans_w * CH_DT_BLK();
-                    const int64_t src_trans_h_stride   = int64_t(src_trans_w) * CH_DT_BLK();
-                    const int64_t src_trans_dh_stride  = int64_t(cp.dilation_h) * src_trans_w * CH_DT_BLK();
+                    const int64_t src_trans_icb_stride = int64_t(src_h) * src_trans_w * IC_DATA_BLK;
+                    const int64_t src_trans_h_stride   = int64_t(src_trans_w) * IC_DATA_BLK;
+                    const int64_t src_trans_dh_stride  = int64_t(cp.dilation_h) * src_trans_w * IC_DATA_BLK;
                     float *src_trans = reinterpret_cast<float*>(temp_buffer_);
 #ifdef PPL_USE_X86_OMP_COLLAPSE
-                    PRAGMA_OMP_FOR_COLLAPSE(3)
+                    PRAGMA_OMP_FOR_COLLAPSE(4)
 #endif
                     for (int64_t g = 0; g < gpl3_eff; ++g) {
+                        for (int64_t b = 0; b < mbl3_eff; ++b) {
 #ifndef PPL_USE_X86_OMP_COLLAPSE
                         PRAGMA_OMP_FOR()
 #endif
-                        for (int64_t b = 0; b < mbl3_eff; ++b) {
-                            for (int64_t icb = 0; icb < div_up(icl2_eff, CH_DT_BLK()); ++icb) {
-                                const float *l_base_src = base_src + g * base_src_g_stride + b * base_src_b_stride + icb * base_src_icb_stride;
-                                float *l_src_trans      = src_trans + g * src_trans_g_stride + b * src_trans_b_stride + icb * src_trans_icb_stride;
+                            for (int64_t icb = 0; icb < div_up(icl2_eff, IC_DATA_BLK); ++icb) {
                                 for (int64_t ih = 0; ih < src_h; ++ih) {
-                                    memset32_avx(l_src_trans, 0, cp.pad_w * CH_DT_BLK());
-                                    l_src_trans += cp.pad_w * CH_DT_BLK();
+                                    const float *l_base_src = base_src + g * base_src_g_stride + b * base_src_b_stride + icb * base_src_icb_stride + ih * src_h_stride;
+                                    float *l_src_trans      = src_trans + g * src_trans_g_stride + b * src_trans_b_stride + icb * src_trans_icb_stride + ih * src_trans_h_stride;
+                                    memset32_avx(l_src_trans, 0, cp.pad_w * IC_DATA_BLK);
+                                    l_src_trans += cp.pad_w * IC_DATA_BLK;
                                     memcpy32_avx(l_src_trans, l_base_src, src_h_stride);
                                     l_src_trans += src_h_stride;
-                                    l_base_src += src_h_stride;
-                                    memset32_avx(l_src_trans, 0, cp.pad_w * CH_DT_BLK());
-                                    l_src_trans += cp.pad_w * CH_DT_BLK();
+                                    memset32_avx(l_src_trans, 0, cp.pad_w * IC_DATA_BLK);
                                 }
                             }
                         }
                     }
-                    base_src            = src_trans + cp.pad_w * CH_DT_BLK();
+                    base_src            = src_trans + cp.pad_w * IC_DATA_BLK;
                     base_src_b_stride   = src_trans_b_stride;
                     base_src_g_stride   = src_trans_g_stride;
-                    base_src_icb_stride = src_trans_icb_stride;
                     base_src_h_stride   = src_trans_h_stride;
+                    base_src_icb_stride = src_trans_icb_stride;
                     base_src_dh_stride  = src_trans_dh_stride;
                 }
-                share_param[SRC_ICB_STRIDE_IDX()] = base_src_icb_stride;
-                share_param[SRC_SW_STRIDE_IDX()] = src_sw_stride;
-                share_param[SRC_DH_STRIDE_IDX()] = base_src_dh_stride;
-                share_param[SRC_DW_STRIDE_IDX()] = src_dw_stride;
-                share_param[CHANNELS_IDX()] = icl2_eff;
-                PICK_PARAM(uint64_t, share_param, FLAGS_IDX()) = kernel_flags;
+
+                ker_p.pick<int64_t>(ker_p_def::SRC_ICB_STRIDE_IDX) = base_src_icb_stride;
+                ker_p.pick<int64_t>(ker_p_def::SRC_DH_STRIDE_IDX) = base_src_dh_stride;
+                ker_p.pick<int64_t>(ker_p_def::CHANNELS_IDX) = icl2_eff;
+                ker_p.pick<uint64_t>(ker_p_def::FLAGS_IDX) = kernel_flags;
 #ifdef PPL_USE_X86_OMP_COLLAPSE
                 PRAGMA_OMP_FOR_COLLAPSE(5)
 #endif
@@ -327,13 +340,14 @@ ppl::common::RetCode conv2d_n16cx_direct_fp32_fma_executor::execute()
                         for (int64_t ocl2 = 0; ocl2 < padded_reg_oc; ocl2 += sp.oc_l2_blk) {
                             for (int64_t oh = 0; oh < dst_h; ++oh) {
                                 for (int64_t owl2 = 0; owl2 < dst_w; owl2 += sp.ow_l2_blk) {
-                                    int64_t private_param[PRIV_PARAM_LEN()];
                                     const int64_t ocl2_eff = min<int64_t>(padded_reg_oc - ocl2, sp.oc_l2_blk);
                                     const int64_t owl2_eff = min<int64_t>(dst_w - owl2, sp.ow_l2_blk);
                                     const int64_t ih       = oh * cp.stride_h - cp.pad_h;
                                     const int64_t iwl2     = owl2 * cp.stride_w - cp.pad_w;
-                                    private_param[KH_START_IDX()] = div_up(min<int64_t>(max<int64_t>(0 - ih, 0), ext_kernel_h), cp.dilation_h);
-                                    private_param[KH_END_IDX()]   = div_up(max<int64_t>(min<int64_t>(src_h - ih, ext_kernel_h), 0), cp.dilation_h);
+
+                                    ker_p.pick<int64_t>(ker_p_def::KH_START_IDX) = div_up(min<int64_t>(max<int64_t>(0 - ih, 0), ext_kernel_h), cp.dilation_h);
+                                    ker_p.pick<int64_t>(ker_p_def::KH_END_IDX)   = div_up(max<int64_t>(min<int64_t>(src_h - ih, ext_kernel_h), 0), cp.dilation_h);
+
                                     int64_t unroll_owl2_start = max(sp.unroll_ow_start, owl2);
                                     int64_t unroll_owl2_end   = min(sp.unroll_ow_end, owl2 + owl2_eff);
                                     if (unroll_owl2_start >= unroll_owl2_end || unroll_owl2_start < 0 || unroll_owl2_end < 0) {
@@ -342,69 +356,52 @@ ppl::common::RetCode conv2d_n16cx_direct_fp32_fma_executor::execute()
                                     const int64_t owl2_unroll_len  = unroll_owl2_end - unroll_owl2_start;
                                     const int64_t owl2_unroll_body = round(owl2_unroll_len, sp.ow_kr_blk);
                                     const int64_t owl2_unroll_tail = owl2_unroll_len - owl2_unroll_body;
-                                    const float *l_src  = base_src + b * base_src_b_stride + g * base_src_g_stride + ih * base_src_h_stride + iwl2 * CH_DT_BLK();
-                                    const float *l_his  = base_his + b * his_b_stride + g * dst_g_stride + ocl2 * dst_h * dst_w + oh * dst_h_stride + owl2 * CH_DT_BLK();
-                                    float *l_dst        = base_dst + b * dst_b_stride + g * dst_g_stride + ocl2 * dst_h * dst_w + oh * dst_h_stride + owl2 * CH_DT_BLK();
+
+                                    const float *l_src  = base_src + b * base_src_b_stride + g * base_src_g_stride + ih * base_src_h_stride + iwl2 * IC_DATA_BLK;
+                                    const float *l_his  = base_his + b * his_b_stride + g * dst_g_stride + ocl2 * dst_h * dst_w + oh * dst_h_stride + owl2 * OC_DATA_BLK;
+                                    float *l_dst        = base_dst + b * dst_b_stride + g * dst_g_stride + ocl2 * dst_h * dst_w + oh * dst_h_stride + owl2 * OC_DATA_BLK;
                                     const float *l_flt  = base_flt + g * flt_g_stride + ocl2 * sp.ic_l2_blk * cp.kernel_h * cp.kernel_w;
                                     const float *l_bias = cvt_bias_ + (g + gpl3) * sp.padded_oc + ocl2;
-                                    for (int64_t oc = ocl2; oc < ocl2 + ocl2_eff; oc += CH_DT_BLK()) {
-                                        const int64_t oc_eff = min<int64_t>(ocl2 + ocl2_eff - oc, CH_DT_BLK());
-                                        const int64_t oc_sel = div_up(oc_eff, CH_RF_BLK()) - 1;
 
-                                        PICK_PARAM(const float *, private_param, SRC_IDX())  = l_src;
-                                        PICK_PARAM(const float *, private_param, HIS_IDX())  = l_his;
-                                        PICK_PARAM(float *, private_param, DST_IDX())        = l_dst;
-                                        PICK_PARAM(const float *, private_param, FLT_IDX())  = l_flt;
-                                        PICK_PARAM(const float *, private_param, BIAS_IDX()) = l_bias;
+                                    for (int64_t oc = ocl2; oc < ocl2 + ocl2_eff; oc += OC_DATA_BLK) {
+                                        const int64_t oc_eff = min<int64_t>(ocl2 + ocl2_eff - oc, OC_DATA_BLK);
+                                        const int64_t oc_reg = div_up(oc_eff, OC_REG_ELTS);
 
-                                        for (int64_t ow = owl2; ow < unroll_owl2_start; ++ow) {
-                                            const int64_t iw              = ow * cp.stride_w - cp.pad_w;
-                                            if (cp.dilation_w == 1) {
-                                                private_param[KW_START_IDX()] = min<int64_t>(max<int64_t>(0 - iw, 0), ext_kernel_w);
-                                                private_param[KW_END_IDX()]   = max<int64_t>(min<int64_t>(src_w - iw, ext_kernel_w), 0);
-                                            } else {
-                                                private_param[KW_START_IDX()] = div_up(min<int64_t>(max<int64_t>(0 - iw, 0), ext_kernel_w), cp.dilation_w);
-                                                private_param[KW_END_IDX()]   = div_up(max<int64_t>(min<int64_t>(src_w - iw, ext_kernel_w), 0), cp.dilation_w);
+                                        ker_p.pick<const float*>(ker_p_def::SRC_PTR_IDX) = l_src;
+                                        ker_p.pick<const float*>(ker_p_def::HIS_PTR_IDX) = l_his;
+                                        ker_p.pick<const float*>(ker_p_def::FLT_PTR_IDX) = l_flt;
+                                        ker_p.pick<const float*>(ker_p_def::BIAS_PTR_IDX) = l_bias;
+                                        ker_p.pick<float*>(ker_p_def::DST_PTR_IDX) = l_dst;
+
+                                        auto border_loop = [&](const int64_t ow_start, const int64_t ow_end) {
+                                            for (int64_t ow = ow_start; ow < ow_end; ++ow) {
+                                                const int64_t iw = ow * cp.stride_w - cp.pad_w;
+                                                if (cp.dilation_w == 1) {
+                                                    ker_p.pick<int64_t>(ker_p_def::KW_START_IDX) = min<int64_t>(max<int64_t>(0 - iw, 0), ext_kernel_w);
+                                                    ker_p.pick<int64_t>(ker_p_def::KW_END_IDX)   = max<int64_t>(min<int64_t>(src_w - iw, ext_kernel_w), 0);
+                                                } else {
+                                                    ker_p.pick<int64_t>(ker_p_def::KW_START_IDX) = div_up(min<int64_t>(max<int64_t>(0 - iw, 0), ext_kernel_w), cp.dilation_w);
+                                                    ker_p.pick<int64_t>(ker_p_def::KW_END_IDX)   = div_up(max<int64_t>(min<int64_t>(src_w - iw, ext_kernel_w), 0), cp.dilation_w);
+                                                }
+                                                ker.execute_border(sp.use_nt_store, oc_reg);
                                             }
-                                            conv2d_n16cx_direct_kernel_fp32_fma_pad_table[nt_store_sel][oc_sel](private_param, share_param);
-                                            PICK_PARAM(const float *, private_param, SRC_IDX()) += src_sw_stride;
-                                            PICK_PARAM(const float *, private_param, HIS_IDX()) += CH_DT_BLK();
-                                            PICK_PARAM(float *, private_param, DST_IDX()) += CH_DT_BLK();
-                                        }
+                                        };
 
+                                        border_loop(owl2, unroll_owl2_start);
                                         if (owl2_unroll_body) {
-                                            private_param[OW_IDX()] = owl2_unroll_body;
-                                            conv2d_n16cx_direct_kernel_fp32_fma_blk_table[nt_store_sel][stride_w_sel][oc_sel][sp.ow_kr_blk - 1](private_param, share_param);
-                                            PICK_PARAM(const float *, private_param, SRC_IDX()) += owl2_unroll_body * src_sw_stride;
-                                            PICK_PARAM(const float *, private_param, HIS_IDX()) += owl2_unroll_body * CH_DT_BLK();
-                                            PICK_PARAM(float *, private_param, DST_IDX()) += owl2_unroll_body * CH_DT_BLK();
+                                            ker_p.pick<int64_t>(ker_p_def::DST_WIDTH_IDX) = owl2_unroll_body;
+                                            ker.execute(sp.use_nt_store, spec_stride_w, oc_reg, sp.ow_kr_blk);
                                         }
                                         if (owl2_unroll_tail) {
-                                            private_param[OW_IDX()] = owl2_unroll_tail;
-                                            conv2d_n16cx_direct_kernel_fp32_fma_blk_table[nt_store_sel][stride_w_sel][oc_sel][owl2_unroll_tail - 1](private_param, share_param);
-                                            PICK_PARAM(const float *, private_param, SRC_IDX()) += owl2_unroll_tail * src_sw_stride;
-                                            PICK_PARAM(const float *, private_param, HIS_IDX()) += owl2_unroll_tail * CH_DT_BLK();
-                                            PICK_PARAM(float *, private_param, DST_IDX()) += owl2_unroll_tail * CH_DT_BLK();
+                                            ker_p.pick<int64_t>(ker_p_def::DST_WIDTH_IDX) = owl2_unroll_tail;
+                                            ker.execute(sp.use_nt_store, spec_stride_w, oc_reg, owl2_unroll_tail);
                                         }
+                                        border_loop(unroll_owl2_end, owl2 + owl2_eff);
 
-                                        for (int64_t ow = unroll_owl2_end; ow < owl2 + owl2_eff; ++ow) {
-                                            const int64_t iw              = ow * cp.stride_w - cp.pad_w;
-                                            if (cp.dilation_w == 1) {
-                                                private_param[KW_START_IDX()] = min<int64_t>(max<int64_t>(0 - iw, 0), ext_kernel_w);
-                                                private_param[KW_END_IDX()]   = max<int64_t>(min<int64_t>(src_w - iw, ext_kernel_w), 0);
-                                            } else {
-                                                private_param[KW_START_IDX()] = div_up(min<int64_t>(max<int64_t>(0 - iw, 0), ext_kernel_w), cp.dilation_w);
-                                                private_param[KW_END_IDX()]   = div_up(max<int64_t>(min<int64_t>(src_w - iw, ext_kernel_w), 0), cp.dilation_w);
-                                            }
-                                            conv2d_n16cx_direct_kernel_fp32_fma_pad_table[nt_store_sel][oc_sel](private_param, share_param);
-                                            PICK_PARAM(const float *, private_param, SRC_IDX()) += src_sw_stride;
-                                            PICK_PARAM(const float *, private_param, HIS_IDX()) += CH_DT_BLK();
-                                            PICK_PARAM(float *, private_param, DST_IDX()) += CH_DT_BLK();
-                                        }
-                                        l_bias += CH_DT_BLK();
-                                        l_flt  += CH_DT_BLK() * sp.ic_l2_blk * cp.kernel_h * cp.kernel_w;
-                                        l_dst  += CH_DT_BLK() * dst_h * dst_w;
-                                        l_his  += CH_DT_BLK() * dst_h * dst_w;
+                                        l_bias += OC_DATA_BLK;
+                                        l_flt  += OC_DATA_BLK * sp.ic_l2_blk * cp.kernel_h * cp.kernel_w;
+                                        l_dst  += OC_DATA_BLK * dst_h * dst_w;
+                                        l_his  += OC_DATA_BLK * dst_h * dst_w;
                                     }
                                 }
                             }
@@ -417,6 +414,7 @@ ppl::common::RetCode conv2d_n16cx_direct_fp32_fma_executor::execute()
             }
         }
     }
+
     } // OMP_PARALLEL
 
     return ppl::common::RC_SUCCESS;
@@ -429,7 +427,7 @@ ppl::common::RetCode conv2d_n16cx_direct_fp32_fma_manager::gen_cvt_weights(const
     }
 
     const int64_t oc_per_gp = param_.num_output / param_.group;
-    const int64_t padded_oc = round_up(oc_per_gp, CH_DT_BLK());
+    const int64_t padded_oc = round_up(oc_per_gp, OC_DATA_BLK);
     const int64_t ic_l2_blk = conv2d_n16cx_direct_fp32_fma_executor::cal_ic_l2_blk(param_);
 
     cvt_bias_size_ = param_.group * padded_oc;
@@ -462,8 +460,8 @@ bool conv2d_n16cx_direct_fp32_fma_manager::is_supported()
     if (param_.is_pointwise()) {
         return false;
     }
-    bool aligned_channels   = param_.channels / param_.group % CH_DT_BLK() == 0;
-    bool aligned_num_output = param_.num_output / param_.group % CH_DT_BLK() == 0;
+    bool aligned_channels   = param_.channels / param_.group % IC_DATA_BLK == 0;
+    bool aligned_num_output = param_.num_output / param_.group % OC_DATA_BLK == 0;
     return (param_.group == 1) || (aligned_channels && aligned_num_output);
 }
 
