@@ -66,8 +66,8 @@ public:
 
     typedef int64_t flag_t;
     struct flag {
-        static const flag_t HIS = (1 << 0);
-        static const flag_t BIAS = (1 << 1);
+        static const flag_t LOAD_BIAS = (1 << 0);
+        static const flag_t ADD_BIAS = (1 << 1);
         static const flag_t RELU = (1 << 11);
         static const flag_t RELU6 = (1 << 12);
     };
