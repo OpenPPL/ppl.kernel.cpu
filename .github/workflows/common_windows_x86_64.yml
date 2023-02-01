@@ -1,4 +1,4 @@
-me: common-windows-x86_64
+name: common-windows-x86_64
 
 on:
   #push:
