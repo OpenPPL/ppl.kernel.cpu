@@ -80,8 +80,6 @@ endif()
 
 set(PPLCOMMON_HOLD_DEPS ${PPLNN_HOLD_DEPS})
 
-set(__PPLCOMMON_COMMIT__ 20699d0d646d3221b0339dcd456abbe05e99a617)
-
 set(PPLCOMMON_USE_X86_64 ${PPLNN_USE_X86_64})
 set(PPLCOMMON_USE_AARCH64 ${PPLNN_USE_AARCH64})
 set(PPLCOMMON_USE_ARMV7 ${PPLNN_USE_ARMV7})
@@ -101,7 +99,7 @@ else()
     endif()
     hpcc_declare_git_dep(pplcommon
         ${PPLNN_DEP_PPLCOMMON_GIT}
-        ${__PPLCOMMON_COMMIT__})
+        master)
 endif()
 
 unset(__PPLCOMMON_COMMIT__)
