@@ -346,8 +346,8 @@ ppl::common::RetCode pd_conv2d_n16cx_direct_ndarray_fp32_avx512_executor::fuse_e
 
                                     const float *base_src      = src_ + b * src_b_stride + g * src_g_stride + eh * src_w - dr_p.pad_w;
                                     float *base_dst            = inter_buffer + dw_p.pad_w * OC_DATA_BLK + (ih % dw_p.kernel_h) * inter_h_stride;
-                                    const float *base_flt      = dr_e->cvt_filter() + g * sp.padded_oc * sp.ic_per_grp * dr_p.kernel_h * dr_p.kernel_w;
-                                    const float *base_bias     = dr_e->cvt_bias() + g * sp.padded_oc;
+                                    const float *base_flt      = dr_e->cvt_filter() + (g * sp.padded_oc + ocl2) * sp.ic_per_grp * dr_p.kernel_h * dr_p.kernel_w;
+                                    const float *base_bias     = dr_e->cvt_bias() + g * sp.padded_oc + ocl2;
 
                                     dr_ker_p.pick<int64_t>(conv2d_n16cx_direct_ndarray_kernel_fp32_avx512::param_def::KH_START_IDX)      = dr_kh_start;
                                     dr_ker_p.pick<int64_t>(conv2d_n16cx_direct_ndarray_kernel_fp32_avx512::param_def::KH_END_IDX)        = dr_kh_end;
