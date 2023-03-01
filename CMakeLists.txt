@@ -28,7 +28,6 @@ endif()
 # dependencies
 
 include(cmake/deps.cmake)
-hpcc_populate_dep(pplcommon)
 
 # --------------------------------------------------------------------------- #
 
@@ -42,6 +41,8 @@ endif()
 
 # --------------------------------------------------------------------------- #
 
+hpcc_populate_dep(pplcommon)
+
 # kernels
 
 if(PPLNN_USE_X86_64)
@@ -54,12 +55,6 @@ endif()
 
 if(PPLNN_USE_AARCH64 OR PPLNN_USE_ARMV7)
     include(cmake/arm.cmake)
-endif()
-
-# installations
-
-if(PPLNN_INSTALL)
-    install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/ppl DESTINATION include)
 endif()
 
 # --------------------------------------------------------------------------- #
