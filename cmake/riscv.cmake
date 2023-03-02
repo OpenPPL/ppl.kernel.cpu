@@ -55,4 +55,5 @@ target_compile_options(pplkernelriscv_static PRIVATE ${PPLKERNELRISCV_COMPILE_OP
 if(PPLNN_INSTALL)
     install(TARGETS pplkernelriscv_static DESTINATION lib)
     install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/pplkernelriscv-config.cmake DESTINATION lib/cmake/ppl)
+    install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/ppl/kernel/riscv DESTINATION include/ppl/kernel)
 endif()

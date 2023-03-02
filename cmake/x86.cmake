@@ -104,6 +104,7 @@ if(PPLNN_INSTALL)
         ${__PPLNN_CMAKE_CONFIG_FILE__}
         @ONLY)
     install(FILES ${__PPLNN_CMAKE_CONFIG_FILE__} DESTINATION lib/cmake/ppl)
+    install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/ppl/kernel/x86 DESTINATION include/ppl/kernel)
     unset(__PPLNN_CMAKE_CONFIG_FILE__)
 endif()
 
