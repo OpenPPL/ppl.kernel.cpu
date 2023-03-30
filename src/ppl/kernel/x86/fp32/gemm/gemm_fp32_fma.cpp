@@ -688,7 +688,7 @@ ppl::common::RetCode gemm_shared_pack_b_threaded_operation_fp32_fma(
     }
     PRAGMA_OMP_BARRIER() // wait for malloc
 
-    if (shared_packed_b == nullptr) {
+    if (*shared_packed_b == nullptr) {
         return ppl::common::RC_OUT_OF_MEMORY;
     }
     float *packed_b = (float*)round_up((uintptr_t)*shared_packed_b, PPL_X86_PAGE_BYTES());
@@ -943,7 +943,7 @@ ppl::common::RetCode gemm_fp32_fma(
             n_threads = 1;
         } else {
             n_threads = min<int64_t>(div_up(N, N_THR_BLK_MIN * 2), 4);
-            if (M < m_threads * M_L3_BLK_MAX / 2) { // small M
+            if (M < div_up(num_threads, n_threads) * M_L3_BLK_MAX / 2) { // small M
                 n_threads = min<int64_t>(max<int64_t>(N / N_THR_BLK_MIN, 1), 4);
             }
             if (M <= M_L3_BLK_MAX && N >= num_threads * N_THR_BLK_MIN && N < num_threads * N_L3_BLK_MAX) { // very small M
@@ -1160,7 +1160,7 @@ ppl::common::RetCode batch_gemm_fp32_fma(
             n_threads = 1;
         } else {
             n_threads = min<int64_t>(div_up(N, N_THR_BLK_MIN * 2), 4);
-            if (M < m_threads * M_L3_BLK_MAX / 2) { // small M
+            if (M < div_up(g_threads, n_threads) * M_L3_BLK_MAX / 2) { // small M
                 n_threads = min<int64_t>(max<int64_t>(N / N_THR_BLK_MIN, 1), 4);
             }
             if (M <= M_L3_BLK_MAX && N >= g_threads * N_THR_BLK_MIN && N < g_threads * N_L3_BLK_MAX) { // very small M
