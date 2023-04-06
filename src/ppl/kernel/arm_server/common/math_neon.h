@@ -42,8 +42,8 @@ inline float32x4_t v_exp_f32(const float32x4_t v_src)
     tmp             = vrndmq_f32(fx);
 #endif
 
-    float32x4_t mask = vreinterpret_f32_u32(vcgtq_f32(tmp, fx));
-    mask            = vreinterpret_f32_s32(vandq_s32(vreinterpret_s32_f32(mask), vreinterpret_s32_f32(one)));
+    float32x4_t mask = vreinterpretq_f32_u32(vcgtq_f32(tmp, fx));
+    mask            = vreinterpretq_f32_s32(vandq_s32(vreinterpretq_s32_f32(mask), vreinterpretq_s32_f32(one)));
     fx              = vsubq_f32(tmp, mask);
 
     tmp           = vmulq_f32(fx, vdupq_n_f32(0.693359375));
