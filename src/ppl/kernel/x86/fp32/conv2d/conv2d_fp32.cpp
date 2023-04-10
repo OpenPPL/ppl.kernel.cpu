@@ -394,7 +394,7 @@ conv2d_fp32_manager *conv2d_fp32_algo_selector::gen_algo(const conv2d_param &par
         if (algo_info.output_format == ppl::common::DATAFORMAT_NDARRAY) {
             if (algo_info.input_format == ppl::common::DATAFORMAT_NDARRAY) {
                 if (algo_info.algo_type == conv2d_algo::IM2COL_GEMM) {
-                    return new conv2d_im2col_gemm_fp32_fma_manager(param, allocator);
+                    return new conv2d_im2col_gemm_fp32_sse_manager(param, allocator);
                 }
                 if (algo_info.algo_type == conv2d_algo::DEPTHWISE) {
                     return new conv2d_depthwise_fp32_sse_manager(param, allocator);
