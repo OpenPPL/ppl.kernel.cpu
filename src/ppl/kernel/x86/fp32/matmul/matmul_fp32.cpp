@@ -62,6 +62,8 @@ ppl::common::RetCode matmul_ndarray_fp32(
     const ppl::common::TensorShape *Y_shape,
     const float *A,
     const float *B,
+    const gemm_m_type_t typeA,
+    const gemm_m_type_t typeB,
     const bool packedB,
     float *Y)
 {
@@ -82,8 +84,11 @@ ppl::common::RetCode matmul_ndarray_fp32(
         B_dims.assign(B_dims_for_arrange.begin(), B_dims_for_arrange.end());
     }
 
-    const int64_t K = A_dims[dim_count - 1];
-    const int64_t N = B_dims[dim_count - 1];
+    const int32_t is_trans_a = typeA == gemm_m_type::TRANS ? 1 : 0;
+    const int32_t is_trans_b = typeB == gemm_m_type::TRANS ? 1 : 0;
+
+    const int64_t K = A_dims[dim_count - 1 - is_trans_a];
+    const int64_t N = B_dims[dim_count - 1 - is_trans_b];
     const bool is_single_gemm = B_shape->CalcElementsExcludingPadding() / (N * K) == 1;
     if (is_single_gemm) {
         for (int64_t i = dim_count - 3; i >= 0; i--) {
@@ -91,14 +96,17 @@ ppl::common::RetCode matmul_ndarray_fp32(
             A_dims[i] = 1;
         }
     }
-    const int64_t M = A_dims[dim_count - 2];
+    const int64_t M = A_dims[dim_count - 2 + is_trans_a];
+
+    const int64_t lda = is_trans_a ? M : K;
+    const int64_t ldb = is_trans_b ? K : N;
 
     if (is_single_gemm) {
         return gemm_fp32(
             isa, A, B, nullptr, nullptr,
-            gemm_m_type::NOTRANS, packedB ? gemm_m_type::PACKED : gemm_m_type::NOTRANS,
+            typeA, packedB ? gemm_m_type::PACKED : typeB,
             gemm_v_type::EMPTY, gemm_m_type::EMPTY,
-            M, N, K, K, N, N, 0, 1.0f, 0.0f, 0.0f, 0.0f,
+            M, N, K, lda, ldb, N, 0, 1.0f, 0.0f, 0.0f, 0.0f,
             gemm_post::NONE, Y);
     }
 
@@ -149,10 +157,22 @@ ppl::common::RetCode matmul_ndarray_fp32(
 
     return batch_gemm_fp32(
         isa, A_list.data(), B_list.data(), nullptr, nullptr,
-        gemm_m_type::NOTRANS, gemm_m_type::NOTRANS,
-        gemm_v_type::EMPTY, gemm_m_type::EMPTY,
-        batch_y, M, N, K, K, N, N, 0, 1.0f, 0.0f, 0.0f, 0.0f,
+        typeA, typeB, gemm_v_type::EMPTY, gemm_m_type::EMPTY,
+        batch_y, M, N, K, lda, ldb, N, 0, 1.0f, 0.0f, 0.0f, 0.0f,
         gemm_post::NONE, Y_list.data());
+}
+
+ppl::common::RetCode matmul_ndarray_fp32(
+    const ppl::common::isa_t isa,
+    const ppl::common::TensorShape *A_shape,
+    const ppl::common::TensorShape *B_shape,
+    const ppl::common::TensorShape *Y_shape,
+    const float *A,
+    const float *B,
+    const bool packedB,
+    float *Y)
+{
+    return matmul_ndarray_fp32(isa, A_shape, B_shape, Y_shape, A, B, gemm_m_type::NOTRANS, gemm_m_type::NOTRANS, packedB, Y);
 }
 
 }}}; // namespace ppl::kernel::x86

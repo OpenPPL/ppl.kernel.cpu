@@ -16,6 +16,7 @@
 // under the License.
 
 #include "ppl/kernel/x86/common/one_hot/one_hot_common.h"
+
 namespace ppl { namespace kernel { namespace x86 {
 
 ppl::common::RetCode one_hot_ndarray_fp32(

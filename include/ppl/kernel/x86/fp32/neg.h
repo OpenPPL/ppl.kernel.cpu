@@ -15,18 +15,19 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "ppl/kernel/x86/common/non_zero/non_zero_common.h"
+#ifndef __ST_PPL_KERNEL_X86_FP32_NEG_H_
+#define __ST_PPL_KERNEL_X86_FP32_NEG_H_
+
+#include "ppl/kernel/x86/common/general_include.h"
 
 namespace ppl { namespace kernel { namespace x86 {
 
-ppl::common::RetCode non_zero_ndarray_bool(
-    const ppl::common::TensorShape *src_shape,
-    const uint8_t *src,
-    void *temp_buffer,
-    int64_t *non_zero_num,
-    int64_t *dst)
-{
-    return non_zero_ndarray<uint8_t>(src_shape, src, temp_buffer, non_zero_num, dst);
-}
+ppl::common::RetCode neg_fp32(
+    const ppl::common::isa_t isa,
+    const ppl::common::TensorShape *x_shape,
+    const float *x,
+    float *y);
 
 }}}; // namespace ppl::kernel::x86
+
+#endif //! __ST_PPL_KERNEL_X86_FP32_NEG_H_

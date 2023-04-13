@@ -19,8 +19,21 @@
 #define __ST_PPL_KERNEL_X86_FP32_MATMUL_H_
 
 #include "ppl/kernel/x86/common/general_include.h"
+#include "ppl/kernel/x86/common/gemm_common.h"
 
 namespace ppl { namespace kernel { namespace x86 {
+
+ppl::common::RetCode matmul_ndarray_fp32(
+    const ppl::common::isa_t isa,
+    const ppl::common::TensorShape *A_shape,
+    const ppl::common::TensorShape *B_shape,
+    const ppl::common::TensorShape *Y_shape,
+    const float *A,
+    const float *B,
+    const gemm_m_type_t typeA,
+    const gemm_m_type_t typeB,
+    const bool packedB,
+    float *Y);
 
 ppl::common::RetCode matmul_ndarray_fp32(
     const ppl::common::isa_t isa,
