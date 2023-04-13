@@ -37,7 +37,7 @@ inline void calc_idx(
 }
 
 template <typename eT>
-ppl::common::RetCode non_zero_ndarray_common(
+ppl::common::RetCode non_zero_ndarray(
     const ppl::common::TensorShape *src_shape,
     const eT *src,
     void *temp_buffer,

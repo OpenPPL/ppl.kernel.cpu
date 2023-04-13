@@ -26,7 +26,7 @@ ppl::common::RetCode non_zero_ndarray_fp32(
     int64_t *non_zero_num,
     int64_t *dst)
 {
-    return non_zero_ndarray_common<float>(src_shape, src, temp_buffer, non_zero_num, dst);
+    return non_zero_ndarray<float>(src_shape, src, temp_buffer, non_zero_num, dst);
 }
 
 }}}; // namespace ppl::kernel::x86
