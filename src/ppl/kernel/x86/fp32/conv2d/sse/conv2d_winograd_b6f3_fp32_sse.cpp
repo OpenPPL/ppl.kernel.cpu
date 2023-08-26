@@ -195,7 +195,7 @@ ppl::common::RetCode conv2d_winograd_b6f3_fp32_sse_executor::prepare()
 }
 
 template <bool first, int64_t channel, int64_t dst_stride>
-static inline void wingorad_b6f3_transpose_4x4_fp32_sse(
+static inline void winograd_b6f3_transpose_4x4_fp32_sse(
     const float *src,
     const int64_t src_stride,
     float *dst)
@@ -219,18 +219,18 @@ static inline void wingorad_b6f3_transpose_4x4_fp32_sse(
 typedef void (*winograd_b6f3_kernel_fp32_sse_func_t)(const float *, const int64_t, float *);
 static const winograd_b6f3_kernel_fp32_sse_func_t winograd_b6f3_transpose_4x4_fp32_sse_func_table[2][CH_RF_BLK() + 1]{
     {
-        nullptr,
-        wingorad_b6f3_transpose_4x4_fp32_sse<false, 1, CH_DT_BLK()>,
-        wingorad_b6f3_transpose_4x4_fp32_sse<false, 2, CH_DT_BLK()>,
-        wingorad_b6f3_transpose_4x4_fp32_sse<false, 3, CH_DT_BLK()>,
-        wingorad_b6f3_transpose_4x4_fp32_sse<false, 4, CH_DT_BLK()>,
+        winograd_b6f3_transpose_4x4_fp32_sse<false, 0, CH_DT_BLK()>,
+        winograd_b6f3_transpose_4x4_fp32_sse<false, 1, CH_DT_BLK()>,
+        winograd_b6f3_transpose_4x4_fp32_sse<false, 2, CH_DT_BLK()>,
+        winograd_b6f3_transpose_4x4_fp32_sse<false, 3, CH_DT_BLK()>,
+        winograd_b6f3_transpose_4x4_fp32_sse<false, 4, CH_DT_BLK()>,
     },
     {
-        nullptr,
-        wingorad_b6f3_transpose_4x4_fp32_sse<true, 1, CH_DT_BLK()>,
-        wingorad_b6f3_transpose_4x4_fp32_sse<true, 2, CH_DT_BLK()>,
-        wingorad_b6f3_transpose_4x4_fp32_sse<true, 3, CH_DT_BLK()>,
-        wingorad_b6f3_transpose_4x4_fp32_sse<true, 4, CH_DT_BLK()>,
+        winograd_b6f3_transpose_4x4_fp32_sse<true, 0, CH_DT_BLK()>,
+        winograd_b6f3_transpose_4x4_fp32_sse<true, 1, CH_DT_BLK()>,
+        winograd_b6f3_transpose_4x4_fp32_sse<true, 2, CH_DT_BLK()>,
+        winograd_b6f3_transpose_4x4_fp32_sse<true, 3, CH_DT_BLK()>,
+        winograd_b6f3_transpose_4x4_fp32_sse<true, 4, CH_DT_BLK()>,
     },
 };
 
@@ -259,7 +259,7 @@ static inline void winograd_b6f3_src_trans_sse(
 }
 
 template <int64_t channel>
-static inline void wingorad_b6f3_memcpy_sse(
+static inline void winograd_b6f3_memcpy_sse(
     const float *l_base_src,
     float *l_base_dst,
     const int64_t tw_len,
@@ -513,7 +513,7 @@ static inline void winograd_b6f3_preprocess_fp32_sse(
                 int64_t w = 0;
                 memset32_sse(l_tile_buffer + w * CH_DT_BLK(), 0, tl_pad * CH_DT_BLK());
                 w += tl_pad;
-                wingorad_b6f3_memcpy_sse<channel>(base_src + h * src_w + tw_start, l_tile_buffer + w * CH_DT_BLK(), tw_len, src_hw, src_stride, dst_stride);
+                winograd_b6f3_memcpy_sse<channel>(base_src + h * src_w + tw_start, l_tile_buffer + w * CH_DT_BLK(), tw_len, src_hw, src_stride, dst_stride);
                 w += tw_len;
                 memset32_sse(l_tile_buffer + w * CH_DT_BLK(), 0, tr_pad * CH_DT_BLK());
                 w += tr_pad;
