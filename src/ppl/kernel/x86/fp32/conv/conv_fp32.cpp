@@ -125,7 +125,7 @@ ppl::common::RetCode conv2d_ndarray_fp32(
             auto ret = gemm_fp32(
                 isa, l_flt, l_col, l_bias, l_sum,
                 gemm_m_type::NOTRANS, gemm_m_type::NOTRANS,
-                bias ? gemm_v_type::EMPTY : gemm_v_type::COL_VEC,
+                bias ? gemm_v_type::COL_VEC : gemm_v_type::EMPTY,
                 typesum, M, N, K, lda, ldb, ldout, 0,
                 1.0, 0.0, 1.0, 1.0, post, l_dst);
             if (ppl::common::RC_SUCCESS != ret) {
@@ -242,7 +242,7 @@ ppl::common::RetCode conv1d_ndarray_fp32(
             auto ret = gemm_fp32(
                 isa, l_flt, l_col, l_bias, l_sum,
                 gemm_m_type::NOTRANS, gemm_m_type::NOTRANS,
-                bias ? gemm_v_type::EMPTY : gemm_v_type::COL_VEC,
+                bias ? gemm_v_type::COL_VEC : gemm_v_type::EMPTY,
                 typesum, M, N, K, lda, ldb, ldout, 0,
                 1.0, 0.0, 1.0, 1.0, post, l_dst);
             if (ppl::common::RC_SUCCESS != ret) {
