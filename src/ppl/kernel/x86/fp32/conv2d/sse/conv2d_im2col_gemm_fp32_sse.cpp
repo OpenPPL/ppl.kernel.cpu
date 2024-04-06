@@ -303,7 +303,8 @@ ppl::common::RetCode conv2d_im2col_gemm_fp32_sse_executor::execute()
                                 if (is_last_k) {
                                     if (with_relu) {
                                         kp.pick<int64_t>(conv_gemm_kernel_fp32_sse::param_def::FLAGS_IDX) |= conv_gemm_kernel_fp32_sse::flag::RELU;
-                                    } else if (with_relu6) {
+                                    }
+                                    if (with_relu6) {
                                         kp.pick<int64_t>(conv_gemm_kernel_fp32_sse::param_def::FLAGS_IDX) |= conv_gemm_kernel_fp32_sse::flag::RELU6;
                                     }
                                 }

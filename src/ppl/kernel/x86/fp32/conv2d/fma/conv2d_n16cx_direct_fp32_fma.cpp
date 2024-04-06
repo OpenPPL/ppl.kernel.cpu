@@ -278,7 +278,8 @@ ppl::common::RetCode conv2d_n16cx_direct_fp32_fma_executor::execute()
                 if (is_last_ic) {
                     if (with_relu) {
                         kernel_flags |= ker_flag::RELU;
-                    } else if (with_relu6) {
+                    }
+                    if (with_relu6) {
                         kernel_flags |= ker_flag::RELU6;
                     }
                 }
