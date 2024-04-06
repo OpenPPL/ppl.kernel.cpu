@@ -657,12 +657,12 @@ ppl::common::RetCode conv2d_depthwise_fp32_sse_executor::execute()
 
     auto dst_trans_func = conv2d_depthwise_fp32_sse_dst_trans<0, 0>;
     if (with_sum) {
+        dst_trans_func = conv2d_depthwise_fp32_sse_dst_trans<0, 1>;
         if (with_relu) dst_trans_func = conv2d_depthwise_fp32_sse_dst_trans<1, 1>;
-        else if (with_relu6) dst_trans_func = conv2d_depthwise_fp32_sse_dst_trans<6, 1>;
-        else dst_trans_func = conv2d_depthwise_fp32_sse_dst_trans<0, 1>;
+        if (with_relu6) dst_trans_func = conv2d_depthwise_fp32_sse_dst_trans<6, 1>;
     } else {
         if (with_relu) dst_trans_func = conv2d_depthwise_fp32_sse_dst_trans<1, 0>;
-        else if (with_relu6) dst_trans_func = conv2d_depthwise_fp32_sse_dst_trans<6, 0>;
+        if (with_relu6) dst_trans_func = conv2d_depthwise_fp32_sse_dst_trans<6, 0>;
     }
 
     PRAGMA_OMP_PARALLEL_FOR()

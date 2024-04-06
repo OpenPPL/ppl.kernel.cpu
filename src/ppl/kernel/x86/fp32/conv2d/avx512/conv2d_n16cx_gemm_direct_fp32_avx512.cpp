@@ -213,7 +213,8 @@ ppl::common::RetCode conv2d_n16cx_gemm_direct_fp32_avx512_executor::execute()
                 if (is_last_ic) {
                     if (with_relu) {
                         kernel_flags |= conv2d_n16cx_gemm_direct_kernel_fp32_avx512::flag::RELU;
-                    } else if (with_relu6) {
+                    }
+                    if (with_relu6) {
                         kernel_flags |= conv2d_n16cx_gemm_direct_kernel_fp32_avx512::flag::RELU6;
                     }
                 }

@@ -430,6 +430,7 @@ for (int64_t lcfg = 0; lcfg < Flag_loop_cfg; ++lcfg) {
         if (Flag_relu == 1) {
             param.fuse_flag |= ppl::kernel::x86::conv_fuse_flag::RELU;
         } else if (Flag_relu == 6) {
+            param.fuse_flag |= ppl::kernel::x86::conv_fuse_flag::RELU;
             param.fuse_flag |= ppl::kernel::x86::conv_fuse_flag::RELU6;
         }
 

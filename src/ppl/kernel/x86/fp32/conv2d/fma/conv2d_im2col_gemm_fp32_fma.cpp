@@ -307,7 +307,8 @@ ppl::common::RetCode conv2d_im2col_gemm_fp32_fma_executor::execute()
                                 if (is_last_k) {
                                     if (with_relu) {
                                         kernel_flags |= KERNEL_FLAG_RELU();
-                                    } else if (with_relu6) {
+                                    }
+                                    if (with_relu6) {
                                         kernel_flags |= KERNEL_FLAG_RELU6();
                                     }
                                 }
